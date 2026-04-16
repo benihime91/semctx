@@ -8,3 +8,4 @@ README.md
 requirements.txt
 SKILL.md
 uv.lock
+tests/
