@@ -44,7 +44,7 @@ uv tool install git+https://github.com/benihime91/semctx.git@v0.1.0
 
 ### Using `SKILL.md` with AI agents
 
-> [!INFO]
+> [!WARNING]
 > After you install the skill, edit the `SKILL.md` you copied into your tool’s skill directory and **align it with your current preferences**: default `--model` (`provider/model`), embedding **provider** choice, `--cache-dir` convention, and any provider-specific environment variables or setup notes. The upstream file uses placeholders; agents will not reliably call `semctx` until those sections match your runtime.
 
 This repo’s root `SKILL.md` is the canonical agent guide. Most tools expect **one directory per skill** with a `SKILL.md` inside (not a lone file in the repo root). Download the latest upstream copy like this, then move it into the path your tool lists below:
