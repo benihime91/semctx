@@ -72,10 +72,10 @@ semctx --target-dir "backend/" --cache-dir ".semctx-vertex" index init --model "
 semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
 ```
 
-Install commands and environment variables for each backend are in the block below (**collapsed by default** on GitHub — open it when you configure that provider).
+Install commands and environment variables for each backend are in the sections below — **three separate collapsibles**, each **collapsed by default** on GitHub (expand the one you need).
 
 <details>
-<summary><strong>Per-provider install and environment</strong> (Ollama install/pull, Gemini <code>GEMINI_API_KEY</code>, Vertex env vars — click to expand)</summary>
+<summary><strong>Ollama embeddings</strong> — install, <code>ollama pull</code>, optional <code>OLLAMA_API_BASE</code></summary>
 
 ### Ollama embeddings
 
@@ -98,6 +98,11 @@ Optional environment variables (only when your Ollama API is not on the default 
 export OLLAMA_API_BASE="http://127.0.0.1:11434"
 ```
 
+</details>
+
+<details>
+<summary><strong>Gemini embeddings</strong> — <code>GEMINI_API_KEY</code></summary>
+
 ### Gemini embeddings
 
 If your default `--model` uses the `gemini/` prefix, set an API key in every shell, CI job, or agent runtime that runs `semctx`:
@@ -105,6 +110,11 @@ If your default `--model` uses the `gemini/` prefix, set an API key in every she
 ```bash
 export GEMINI_API_KEY="your-api-key"
 ```
+
+</details>
+
+<details>
+<summary><strong>Vertex AI embeddings</strong> — <code>GOOGLE_*</code> / <code>VERTEX_*</code> env vars</summary>
 
 ### Vertex AI embeddings
 
