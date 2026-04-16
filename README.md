@@ -2,7 +2,35 @@
 
 A semantic codebase discovery and search CLI. It provides repository discovery, indexed semantic search, and blast-radius analysis.
 
+> [!NOTE]
+> This project start as a full rewrite of the [Context+ project](https://github.com/ForLoopCodes/contextplus) into a native Python CLI.
+
+## Table of contents
+
+- [Installation](#installation)
+  - [Using SKILL.md with AI agents](#using-skillmd-with-ai-agents)
+    - [Cursor](#cursor)
+    - [OpenCode](#opencode)
+    - [Codex](#codex-openai)
+    - [Claude Code](#claude-code)
+- [Quick Start](#quick-start)
+  - [Embedding providers](#embedding-providers)
+  - [Ollama embeddings](#ollama-embeddings)
+  - [Gemini embeddings](#gemini-embeddings)
+  - [Vertex AI embeddings](#vertex-ai-embeddings)
+  - [First commands](#first-commands)
+  - [Scope model](#scope-model)
+- [Supported Languages](#supported-languages)
+- [Supported Commands](#supported-commands)
+  - [Discovery (Tree & Skeleton)](#discovery-tree-skeleton)
+  - [Semantic Search](#semantic-search)
+  - [Index lifecycle](#index-lifecycle)
+  - [Blast radius](#blast-radius)
+- [Development checks](#development-checks)
+
 ## Installation
+
+This section is everything you need before **Quick Start**: install the `semctx` CLI, then **install the agent skill** so Cursor, OpenCode, Codex, or Claude Code pick up `SKILL.md` from the right path. **Quick Start** covers embedding providers (Ollama, Gemini, Vertex), environment variables, and your first commands.
 
 Install `semctx` as a `uv` tool from GitHub:
 
@@ -16,39 +44,74 @@ uv tool install git+https://github.com/benihime91/semctx.git@v0.1.0
 
 ### Using `SKILL.md` with AI agents
 
-> For AI AGENTS:
-> Install [semctx](https://github.com/benihime91/semctx/tree/main). Add the upstream skill from [SKILL.md](https://raw.githubusercontent.com/benihime91/semctx/refs/heads/main/SKILL.md) in your current installation. Before finalising the skill install make sure that you ask the user for the default model and provide options to choose from. Once installed verify the skill works.
+> [!INFO]
+> After you install the skill, edit the `SKILL.md` you copied into your tool’s skill directory and **align it with your current preferences**: default `--model` (`provider/model`), embedding **provider** choice, `--cache-dir` convention, and any provider-specific environment variables or setup notes. The upstream file uses placeholders; agents will not reliably call `semctx` until those sections match your runtime.
 
-If your agent platform supports repo-local skill or instruction files, point it
-at `SKILL.md` in the repository root.
+This repo’s root `SKILL.md` is the canonical agent guide. Most tools expect **one directory per skill** with a `SKILL.md` inside (not a lone file in the repo root). Download the latest upstream copy like this, then move it into the path your tool lists below:
 
-The exact wiring depends on the agent framework, but the intended setup is:
+```bash
+curl -fsSL -o /tmp/semctx-SKILL.md https://raw.githubusercontent.com/benihime91/semctx/refs/heads/main/SKILL.md
+```
+
+On every platform, after the file is in place, edit **Default model configuration** (and any provider env notes) so they match the user’s embedding backend—placeholders will not work for real runs.
+
+Shared expectations for agents:
 
 - make `semctx` available on `PATH`
 - prefer `semctx --json` for programmatic and agent-driven calls
 - pass `--target-dir` to define the content scope for indexing and search
 - pass `--cache-dir` to control where `index.db` and embedding artifacts live
-- configure a default model in `SKILL.md`, then pass overrides only as `--model provider/model`
+- configure a default model in the skill (or in `AGENTS.md` / `CLAUDE.md` where applicable), then pass overrides only as `--model provider/model`
 
-## Required: choose a default embedding model
+Your AI agents should use that configured default model for `index init`, `index refresh`, `search-code`, and `search-identifiers` unless you explicitly override it with `--model provider/model`.
 
-Before you use indexed semctx commands through an LLM or AI agent, choose a
-default embedding provider/model and make sure that provider is actually ready
-in the runtime where the agent will call semctx.
+#### Cursor
 
-This is required because `search-code`, `search-identifiers`, and the `index`
-commands depend on embeddings. If the default model is unclear or the provider
-environment is missing, agent-driven semctx calls will be unreliable.
+- **Project (committed):** `.cursor/skills/<skill-name>/SKILL.md` — for example `.cursor/skills/semctx/SKILL.md`.
+- **Personal:** `~/.cursor/skills/<skill-name>/SKILL.md` so the skill applies across workspaces.
 
-### Supported provider/model examples
+Copy or move `/tmp/semctx-SKILL.md` into that `SKILL.md` path (create the folders first). Cursor loads project skills from `.cursor/skills/`; see Cursor’s **create-skill** / Agent Skills docs for layout and frontmatter conventions.
 
-Use full `provider/model` strings with the shipped CLI:
+#### OpenCode
+
+OpenCode discovers standard layout skills from several locations (see [Agent skills](https://opencode.ai/docs/skills/)):
+
+- **Project:** `.opencode/skills/<skill-name>/SKILL.md` (recommended), or compatible trees `.claude/skills/<skill-name>/SKILL.md`, `.agents/skills/<skill-name>/SKILL.md` under the repo.
+- **Global:** `~/.config/opencode/skills/<skill-name>/SKILL.md`, or `~/.claude/skills/`, `~/.agents/skills/` for user-wide skills.
+
+Place the downloaded `SKILL.md` under a new folder such as `semctx`. OpenCode loads skills on demand via its `skill` tool; if a skill does not appear, confirm the directory name, frontmatter `name` / `description`, and [`opencode.json` skill permissions](https://opencode.ai/docs/skills/).
+
+#### Codex (OpenAI)
+
+Codex uses the Agent Skills layout for reusable workflows (see [Customization: skills](https://developers.openai.com/codex/concepts/customization/) and [Create a skill](https://developers.openai.com/codex/skills/create-skill)):
+
+- **Project (team):** `.agents/skills/<skill-name>/SKILL.md` in the repository.
+- **Personal:** `~/.agents/skills/<skill-name>/SKILL.md` for defaults on your machine.
+
+Copy the downloaded file into `SKILL.md` inside that folder. For durable repo-wide instructions (build commands, conventions, **when** to call semctx), also maintain a root **`AGENTS.md`**; Codex reads it automatically in addition to skills. In the CLI you can scaffold with `/init`, then merge in semctx-specific guidance.
+
+#### Claude Code
+
+Claude Code loads skills from project or user scope (see [Explore the `.claude` directory](https://code.claude.com/docs/en/claude-directory)):
+
+- **Project (committed):** `.claude/skills/<skill-name>/SKILL.md`.
+- **Personal:** `~/.claude/skills/<skill-name>/SKILL.md`.
+
+Optional: add or extend root **`CLAUDE.md`** for session-wide project context (build, architecture) alongside the skill. After installing, run `/skills` in a session to confirm the skill is listed.
+
+## Quick Start
+
+`index`, `search-code`, and `search-identifiers` depend on embeddings. Choose a `provider/model`, satisfy that provider's environment (below), then run [First commands](#first-commands).
+
+### Embedding providers
+
+`semctx` treats `--model provider/model` as the canonical embedding selector for embedding-aware commands (via `litellm`). Use the full provider-prefixed string everywhere you override embeddings.
+
+Supported examples:
 
 - `ollama/nomic-embed-text-v2-moe:latest`
 - `gemini/gemini-embedding-2-preview`
 - `vertex_ai/gemini-embedding-2-preview`
-
-### Provider requirements
 
 | Provider example                        | Required setup                                                                                                                                                      |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -56,47 +119,60 @@ Use full `provider/model` strings with the shipped CLI:
 | `gemini/gemini-embedding-2-preview`     | Export `GEMINI_API_KEY` in the shell, CI job, or agent runtime that will execute `semctx`.                                                                          |
 | `vertex_ai/gemini-embedding-2-preview`  | Export `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `VERTEX_LOCATION`. Use a runtime with semctx's LiteLLM and Google auth dependencies available. |
 
-For `vertex_ai`, semctx normalizes an unset or `global` `VERTEX_LOCATION` to
-`us-central1` for LiteLLM's Vertex path.
+For `vertex_ai`, semctx normalizes an unset or `global` `VERTEX_LOCATION` to `us-central1` for LiteLLM's Vertex path.
 
-### After install, customize `SKILL.md`
-
-`SKILL.md` is the agent-facing guide. After installation, edit its
-`Default model configuration` section and replace the placeholders with your
-real defaults.
-
-At minimum, set:
-
-- your default `--model provider/model`
-- your default `--cache-dir` convention
-- the provider-specific requirements your agent runtime already satisfies
-
-Your AI agents should use that configured default model for `index init`,
-`index refresh`, `search-code`, and `search-identifiers` unless you explicitly
-override it with `--model provider/model`.
-
-## Development Checks
-
-Install dev dependencies and wire up the local git hooks:
+If you expect an AI agent to call semctx repeatedly, do not leave the default model implicit. Put the chosen `provider/model` and its setup notes in `SKILL.md`, then have the agent use that default unless the task explicitly asks for another model.
 
 ```bash
-uv sync --dev
-pre-commit install
+# Local Ollama embeddings
+semctx --target-dir "backend/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" search-code "retry policy" --model "ollama/nomic-embed-text-v2-moe:latest"
+
+# Vertex AI embeddings (use a separate cache dir if you switch providers)
+semctx --target-dir "backend/" --cache-dir ".semctx-vertex" index init --model "vertex_ai/gemini-embedding-2-preview"
+semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
 ```
 
-Validate the hook config or run the approved fast-core profile on demand:
+### Ollama embeddings
+
+If your default `--model` uses the `ollama/` prefix (for example `ollama/nomic-embed-text-v2-moe:latest`), install and run [Ollama](https://ollama.com/) on the same machine (or network-reachable host) that will execute `semctx`, then pull the **exact** embedding model name you pass to `--model`:
 
 ```bash
-pre-commit validate-config
-pre-commit run --all-files
-ruff check src/semctx
-ty check src/semctx
-python -m compileall "src/semctx"
+# Install Ollama (see https://ollama.com/download for installers and package managers)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull the embedding weights semctx will request via LiteLLM
+ollama pull nomic-embed-text-v2-moe:latest
 ```
 
-The pre-commit profile stays intentionally small: fast file-hygiene hooks, Astral's official `uv-lock` hook, plus local `ruff check src/semctx`, `ty check src/semctx`, and `python -m compileall "src/semctx"` checks.
+Keep the Ollama daemon running while indexing or searching (`ollama serve` runs in the background on most installs). No API key is required for a local server on the default address.
 
-## Quick Start
+Optional environment variables (only when your Ollama API is not on the default host or port):
+
+```bash
+# LiteLLM / semctx: override the Ollama OpenAI-compatible base URL if needed
+export OLLAMA_API_BASE="http://127.0.0.1:11434"
+```
+
+### Gemini embeddings
+
+If your default `--model` uses the `gemini/` prefix, set an API key in every shell, CI job, or agent runtime that runs `semctx`:
+
+```bash
+export GEMINI_API_KEY="your-api-key"
+```
+
+### Vertex AI embeddings
+
+If your default `--model` uses the `vertex_ai/` prefix, point LiteLLM at Google Cloud with application-default credentials (or a service account) plus project and region. `semctx` maps these into the env names LiteLLM expects; unset or `global` `VERTEX_LOCATION` is normalized to `us-central1`.
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+export GOOGLE_CLOUD_PROJECT="your-gcp-project"
+export VERTEX_LOCATION="us-central1"
+```
+
+### First commands
 
 Explore a repository subtree and its semantics:
 
@@ -118,7 +194,7 @@ semctx --json tree backend/ --depth-limit 2
 semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication" --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
-### Scope Model
+### Scope model
 
 - `--target-dir` is the only content scope. It is the directory whose files are indexed and searched.
 - `--cache-dir` is only where `semctx` stores `index.db` and related artifacts.
@@ -191,46 +267,7 @@ Normal search runs recover the local index when the safe fix is obvious:
 
 You can still manage lifecycle state explicitly with the `index` commands when you want to inspect or control the rebuild step yourself.
 
-#### Embedding providers
-
-`semctx` treats `--model provider/model` as the canonical embedding selector for embedding-aware commands. Use the full provider-prefixed model string everywhere you override embeddings.
-
-If you expect an AI agent to call semctx repeatedly, do not leave the default
-model implicit. Put the chosen `provider/model` and its setup notes in
-`SKILL.md`, then have the agent use that default unless the task explicitly
-asks for another model.
-
-```bash
-# Local Ollama embeddings
-semctx --target-dir "backend/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
-semctx --target-dir "backend/" --cache-dir ".semctx" search-code "retry policy" --model "ollama/nomic-embed-text-v2-moe:latest"
-
-# Vertex AI embeddings
-semctx --target-dir "backend/" --cache-dir ".semctx-vertex" index init --model "vertex_ai/gemini-embedding-2-preview"
-semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
-```
-
-Provider notes:
-
-- `ollama` requires a running local Ollama service and the selected model pulled locally.
-- `gemini` requires `GEMINI_API_KEY`.
-- `vertex_ai` requires Google auth env vars and a runtime with Google auth support.
-
-For `gemini`, set:
-
-```bash
-export GEMINI_API_KEY="your-api-key"
-```
-
-For `vertex_ai`, set the Google and Vertex environment variables before running indexed search:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
-export GOOGLE_CLOUD_PROJECT="your-gcp-project"
-export VERTEX_LOCATION="us-central1"
-```
-
-`semctx` maps those values into the Vertex names LiteLLM expects. If `VERTEX_LOCATION` is unset or set to `global`, it falls back to `us-central1`.
+Choose a `provider/model`, set up the provider environment, and use consistent `--model` and `--cache-dir` values as described in [Embedding providers](#embedding-providers) (Quick Start).
 
 ### Index Lifecycle
 
@@ -270,3 +307,24 @@ Trace symbol usage across your codebase before deleting or refactoring.
 # Find every usage of 'fetch_embedding' outside of its defining file
 semctx blast-radius fetch_embedding src/semctx/core/embeddings.py
 ```
+
+## Development checks
+
+Install dev dependencies and wire up the local git hooks:
+
+```bash
+uv sync --dev
+pre-commit install
+```
+
+Validate the hook config or run the approved fast-core profile on demand:
+
+```bash
+pre-commit validate-config
+pre-commit run --all-files
+ruff check src/semctx
+ty check src/semctx
+python -m compileall "src/semctx"
+```
+
+The pre-commit profile stays intentionally small: fast file-hygiene hooks, Astral's official `uv-lock` hook, plus local `ruff check src/semctx`, `ty check src/semctx`, and `python -m compileall "src/semctx"` checks.
