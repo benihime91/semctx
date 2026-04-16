@@ -37,7 +37,7 @@ semctx <command> [options]
 
 ## Required setup: default model configuration
 
-> [!INFO]
+> [!NOTE]
 > Keep **this `SKILL.md`** aligned with your current preferences: default `--model` (`provider/model`), embedding **provider**, `--cache-dir` convention, and provider-specific environment variables or notes. If you copied this file from upstream, replace placeholders whenever your team changes backends or defaults so agents do not run `semctx` with stale embed settings.
 
 Before an AI agent uses `search-code`, `search-identifiers`, or `index`
