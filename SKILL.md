@@ -1,11 +1,11 @@
 ---
-name: semctx
+
+## name: semctx
 description: >-
   Semantic codebase discovery, search, and impact analysis CLI. Use when
   exploring unfamiliar repositories, finding code by meaning, locating symbol
   definitions or usages, tracing blast radius before refactors, or when the
   user mentions semctx, code search, codebase indexing, or symbol tracing.
----
 
 # semctx — Semantic Code Context CLI
 
@@ -29,11 +29,13 @@ semctx <command> [options]
 
 ## Global Options
 
+
 | Flag                | Default                | Purpose                             |
 | ------------------- | ---------------------- | ----------------------------------- |
 | `--json`            | off                    | Emit JSON instead of human text     |
 | `--target-dir PATH` | cwd                    | Content scope for index/search      |
 | `--cache-dir PATH`  | `<target-dir>/.semctx` | Index DB + embedding cache location |
+
 
 ## Required setup: default model configuration
 
@@ -77,11 +79,13 @@ fail or use the wrong embedding backend.
 
 ### Supported provider examples
 
+
 | Provider example                        | What the user must set up                                             |
 | --------------------------------------- | --------------------------------------------------------------------- |
 | `ollama/nomic-embed-text-v2-moe:latest` | Install Ollama, start the local service, and pull the embedding model |
 | `gemini/text-embedding-004`             | Set `GEMINI_API_KEY` in the runtime environment                       |
 | `vertex_ai/gemini-embedding-2-preview`  | Provide Google auth env vars and a runtime with Google auth support   |
+
 
 ### Agent rule
 
@@ -103,12 +107,14 @@ degrades detail when output exceeds the token budget.
 semctx tree [TARGET_PATH] [--depth-limit N] [--include-symbols/--no-symbols] [--max-tokens N]
 ```
 
+
 | Arg / Option        | Default | Notes                           |
 | ------------------- | ------- | ------------------------------- |
 | `TARGET_PATH`       | `.`     | Relative path to inspect        |
 | `--depth-limit`     | `2`     | Max directory depth             |
 | `--include-symbols` | on      | Toggle symbol listing per file  |
 | `--max-tokens`      | `20000` | Approximate output token budget |
+
 
 **JSON payload keys**: `command`, `root`, `target_path`, `depth_limit`,
 `directories`, `files[]` (each with `path`, `language`, `header_lines`,
@@ -142,12 +148,14 @@ semctx index refresh [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit
 semctx index clear
 ```
 
+
 | Subcommand | Purpose                                                  |
 | ---------- | -------------------------------------------------------- |
 | `init`     | Build a fresh index from scratch                         |
 | `status`   | Show indexed file count, model, staleness                |
 | `refresh`  | Incrementally update; `--full` forces a complete rebuild |
 | `clear`    | Delete the index database                                |
+
 
 The `--model` flag accepts `provider/model` strings (e.g.
 `ollama/nomic-embed-text-v2-moe:latest`, `gemini/text-embedding-004`,
@@ -156,6 +164,13 @@ The `--model` flag accepts `provider/model` strings (e.g.
 **Auto-index**: `search-code` and `search-identifiers` automatically run
 `init` or `refresh` when needed, so explicit index management is optional
 unless you want control over model selection or timing.
+
+**If auto-recovery is not enough:** When a command still fails or status shows
+**stale**, run `semctx index refresh` with the same `--target-dir`,
+`--cache-dir`, and `--model`, then **retry** the search (or other indexed
+command). When status shows **rebuild required** or you see
+`full_rebuild_required`, run `semctx index refresh --full` with those same
+flags, then **retry** the original command once it succeeds.
 
 ### 4. `search-code` — Semantic code chunk search
 
@@ -166,6 +181,7 @@ lexical scoring.
 semctx search-code QUERY [--top-k N] [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit N]
 ```
 
+
 | Arg / Option    | Default       | Notes                             |
 | --------------- | ------------- | --------------------------------- |
 | `QUERY`         | required      | Natural-language or keyword query |
@@ -173,6 +189,7 @@ semctx search-code QUERY [--top-k N] [--model PROVIDER/MODEL] [--target-dir PATH
 | `--model`       | index default | Override embedding model          |
 | `--target-dir`  | `.`           | Scope the search root             |
 | `--depth-limit` | `8`           | Directory depth limit             |
+
 
 **JSON payload keys**: `command`, `query`, `matches[]` (each with
 `relative_path`, `start_line`, `end_line`, `score`, `semantic_score`,
@@ -209,11 +226,13 @@ Scans the repo for external usages of a symbol defined in a specific file.
 semctx blast-radius SYMBOL_NAME FILE_CONTEXT [--depth-limit N]
 ```
 
+
 | Arg / Option    | Default  | Notes                              |
 | --------------- | -------- | ---------------------------------- |
 | `SYMBOL_NAME`   | required | Exact symbol name                  |
 | `FILE_CONTEXT`  | required | Relative path to the defining file |
 | `--depth-limit` | `99`     | Directory depth limit              |
+
 
 **JSON payload keys**: `command`, `symbol_name`, `file_context`, `depth_limit`,
 `definition` (line info or null), `usages[]` (each with file, line, snippet).
@@ -292,10 +311,12 @@ JSON errors have this shape:
 
 Common error codes:
 
-- `index_not_found` — run `semctx index init`
-- `full_rebuild_required` — run `semctx index refresh --full`
+- `index_not_found` — run `semctx index init` (with the same `--target-dir`, `--cache-dir`, and `--model` you use for search), then **retry** the command that failed.
+- `full_rebuild_required` — run `semctx index refresh --full` with the same `--target-dir`, `--cache-dir`, and `--model`, then **retry** the original command. Do not stop after refresh; always re-run search or the workflow step once the rebuild finishes.
 
 Non-zero exit code accompanies all errors.
+
+**Stale vs rebuild (agents):** If `index status` or JSON/tool output indicates the index is **stale** (incremental update is enough), run `semctx index refresh` (without `--full`), then retry. If it indicates **rebuild required** / incompatible metadata, run `semctx index refresh --full`, then retry.
 
 ---
 
@@ -303,11 +324,13 @@ Non-zero exit code accompanies all errors.
 
 The `--model` flag uses `provider/model` format:
 
+
 | Provider    | Example                                 | Notes                                                                           |
 | ----------- | --------------------------------------- | ------------------------------------------------------------------------------- |
 | `ollama`    | `ollama/nomic-embed-text-v2-moe:latest` | Requires a running local Ollama service and the embedding model pulled locally  |
 | `gemini`    | `gemini/text-embedding-004`             | Requires `GEMINI_API_KEY`                                                       |
 | `vertex_ai` | `vertex_ai/gemini-embedding-2-preview`  | Requires Google auth env vars plus a runtime with LiteLLM + Google auth support |
+
 
 If `--model` is omitted, the index uses whatever model it was originally built
 with. For reliable agent use, users should still configure and document their
@@ -346,10 +369,13 @@ If `VERTEX_LOCATION` is unset or set to `global`, semctx normalizes it to
 - The index lives at `<target-dir>/.semctx/index.db` by default.
 - `.gitignore` and `.ignore` files control which files are walked and indexed.
 - Search commands auto-init/refresh the index when safe; they fail with
-  `full_rebuild_required` if schema or metadata is incompatible.
+`full_rebuild_required` if schema or metadata is incompatible — then you
+must run `index refresh --full` and **retry**; for **stale** indexes, run
+`index refresh` (incremental) and **retry**.
 - Embedding results are cached on disk under `.semctx/embeddings/` to avoid
-  redundant API calls.
+redundant API calls.
 - `target_dir` is the only content scope for indexed search; files outside it
-  are not indexed or returned.
+are not indexed or returned.
 - `tree` automatically reduces detail (drops symbols, then headers) when output
-  would exceed `--max-tokens`.
+would exceed `--max-tokens`.
+

@@ -49,11 +49,13 @@ Supported examples:
 - `gemini/gemini-embedding-2-preview`
 - `vertex_ai/gemini-embedding-2-preview`
 
+
 | Provider example                        | Required setup                                                                                                                                                      |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ollama/nomic-embed-text-v2-moe:latest` | Install Ollama, start the local Ollama service, and pull the embedding model before running `semctx`.                                                               |
 | `gemini/gemini-embedding-2-preview`     | Export `GEMINI_API_KEY` in the shell, CI job, or agent runtime that will execute `semctx`.                                                                          |
 | `vertex_ai/gemini-embedding-2-preview`  | Export `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `VERTEX_LOCATION`. Use a runtime with semctx's LiteLLM and Google auth dependencies available. |
+
 
 For `vertex_ai`, semctx normalizes an unset or `global` `VERTEX_LOCATION` to `us-central1` for LiteLLM's Vertex path.
 
@@ -71,8 +73,7 @@ semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry p
 
 Install commands and environment variables for each backend are in the sections below — **three separate collapsibles**, each **collapsed by default** on GitHub (expand the one you need).
 
-<details>
-<summary><strong>Ollama embeddings</strong> — install, <code>ollama pull</code>, optional <code>OLLAMA_API_BASE</code></summary>
+**Ollama embeddings** — install, `ollama pull`, optional `OLLAMA_API_BASE`
 
 ### Ollama embeddings
 
@@ -95,10 +96,9 @@ Optional environment variables (only when your Ollama API is not on the default 
 export OLLAMA_API_BASE="http://127.0.0.1:11434"
 ```
 
-</details>
 
-<details>
-<summary><strong>Gemini embeddings</strong> — <code>GEMINI_API_KEY</code></summary>
+
+**Gemini embeddings** — `GEMINI_API_KEY`
 
 ### Gemini embeddings
 
@@ -108,10 +108,9 @@ If your default `--model` uses the `gemini/` prefix, set an API key in every she
 export GEMINI_API_KEY="your-api-key"
 ```
 
-</details>
 
-<details>
-<summary><strong>Vertex AI embeddings</strong> — <code>GOOGLE_*</code> / <code>VERTEX_*</code> env vars</summary>
+
+**Vertex AI embeddings** — `GOOGLE_`* / `VERTEX_*` env vars
 
 ### Vertex AI embeddings
 
@@ -123,7 +122,7 @@ export GOOGLE_CLOUD_PROJECT="your-gcp-project"
 export VERTEX_LOCATION="us-central1"
 ```
 
-</details>
+
 
 ### Using `SKILL.md` with AI agents
 
@@ -162,7 +161,7 @@ OpenCode discovers standard layout skills from several locations (see [Agent ski
 - **Project:** `.opencode/skills/<skill-name>/SKILL.md` (recommended), or compatible trees `.claude/skills/<skill-name>/SKILL.md`, `.agents/skills/<skill-name>/SKILL.md` under the repo.
 - **Global:** `~/.config/opencode/skills/<skill-name>/SKILL.md`, or `~/.claude/skills/`, `~/.agents/skills/` for user-wide skills.
 
-Place the downloaded `SKILL.md` under a new folder such as `semctx`. OpenCode loads skills on demand via its `skill` tool; if a skill does not appear, confirm the directory name, frontmatter `name` / `description`, and [`opencode.json` skill permissions](https://opencode.ai/docs/skills/).
+Place the downloaded `SKILL.md` under a new folder such as `semctx`. OpenCode loads skills on demand via its `skill` tool; if a skill does not appear, confirm the directory name, frontmatter `name` / `description`, and `[opencode.json` skill permissions](https://opencode.ai/docs/skills/).
 
 #### Codex (OpenAI)
 
@@ -171,7 +170,7 @@ Codex uses the Agent Skills layout for reusable workflows (see [Customization: s
 - **Project (team):** `.agents/skills/<skill-name>/SKILL.md` in the repository.
 - **Personal:** `~/.agents/skills/<skill-name>/SKILL.md` for defaults on your machine.
 
-Copy the downloaded file into `SKILL.md` inside that folder. For durable repo-wide instructions (build commands, conventions, **when** to call semctx), also maintain a root **`AGENTS.md`**; Codex reads it automatically in addition to skills. In the CLI you can scaffold with `/init`, then merge in semctx-specific guidance.
+Copy the downloaded file into `SKILL.md` inside that folder. For durable repo-wide instructions (build commands, conventions, **when** to call semctx), also maintain a root `**AGENTS.md`**; Codex reads it automatically in addition to skills. In the CLI you can scaffold with `/init`, then merge in semctx-specific guidance.
 
 #### Claude Code
 
@@ -180,7 +179,7 @@ Claude Code loads skills from project or user scope (see [Explore the `.claude` 
 - **Project (committed):** `.claude/skills/<skill-name>/SKILL.md`.
 - **Personal:** `~/.claude/skills/<skill-name>/SKILL.md`.
 
-Optional: add or extend root **`CLAUDE.md`** for session-wide project context (build, architecture) alongside the skill. After installing, run `/skills` in a session to confirm the skill is listed.
+Optional: add or extend root `**CLAUDE.md`** for session-wide project context (build, architecture) alongside the skill. After installing, run `/skills` in a session to confirm the skill is listed.
 
 ## Quick Start
 
