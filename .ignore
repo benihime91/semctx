@@ -1,1 +1,10 @@
-tests/
+.gitignore
+.ignore
+.pre-commit-config.yaml
+.python-version
+LICENSE
+pyproject.toml
+README.md
+requirements.txt
+SKILL.md
+uv.lock
