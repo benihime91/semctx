@@ -5,9 +5,10 @@ from pathlib import Path
 
 from beartype import beartype
 
+from semctx.core.embedding_provider import EmbeddingProviderConfig
 from semctx.core.embeddings import cosine_similarity
 from semctx.core.index_store import IndexStore
-from semctx.tools.index_lifecycle import get_index_db_path
+from semctx.tools.index_lifecycle import get_index_db_path, get_legacy_index_db_path
 from semctx.tools.search_intent import SearchIntent
 from semctx.tools.search_ranking import (
   SearchRankingOptions,
@@ -38,9 +39,18 @@ class IndexedChunk:
 
 
 @beartype
-def load_index_store(cache_dir: Path) -> IndexStore:
-  """Load the code-search index store or fail clearly."""
-  db_path = get_index_db_path(cache_dir)
+def load_index_store(cache_dir: Path, provider: EmbeddingProviderConfig) -> IndexStore:
+  """Load the explicitly targeted code-search index store or fail clearly."""
+  db_path = get_index_db_path(cache_dir, provider)
+  if not db_path.exists():
+    raise FileNotFoundError("Index not found. Run `semctx index init` first.")
+  return IndexStore(db_path)
+
+
+@beartype
+def load_legacy_index_store(cache_dir: Path) -> IndexStore:
+  """Load the legacy shared code-search index store or fail clearly."""
+  db_path = get_legacy_index_db_path(cache_dir)
   if not db_path.exists():
     raise FileNotFoundError("Index not found. Run `semctx index init` first.")
   return IndexStore(db_path)

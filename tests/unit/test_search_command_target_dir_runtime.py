@@ -13,6 +13,8 @@ from semctx.config.runtime_settings import build_runtime_settings
 from semctx.tools.index_lifecycle import ensure_search_ready_index
 from tests.unit.search_command_test_support import fake_fetch_embeddings, write_project
 
+MODEL_SELECTOR = "ollama/test-model"
+
 
 def test_build_command_runtime_settings_overrides_target_dir(tmp_path: Path) -> None:
   runtime_settings = build_runtime_settings(
@@ -73,7 +75,7 @@ def test_search_identifiers_json_mode_keeps_payload_shape(
   payload = search_identifiers_command.build_search_identifiers_payload(
     runtime_settings=runtime_settings,
     query="widget builder",
-    model="test-model",
+    model=MODEL_SELECTOR,
   )
 
   assert payload["provider"] == "ollama"

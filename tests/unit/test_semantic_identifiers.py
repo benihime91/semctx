@@ -2,6 +2,7 @@
 # FEATURE: Ranked indexed identifier matches.
 from pathlib import Path
 
+from semctx.core.embedding_provider import resolve_explicit_embedding_provider
 from semctx.config.runtime_settings import build_runtime_settings
 from semctx.tools.index_lifecycle import init_index
 from semctx.tools.semantic_identifiers import semantic_identifier_search
@@ -13,6 +14,9 @@ from tests.unit.semantic_identifier_fixtures import (
   vector_for_text,
 )
 
+MODEL_SELECTOR = "ollama/test-model"
+SEARCH_PROVIDER = resolve_explicit_embedding_provider(None, MODEL_SELECTOR)
+
 
 def test_semantic_identifier_search_reads_identifier_docs_from_index_and_uses_cache(
   tmp_path: Path,
@@ -22,7 +26,7 @@ def test_semantic_identifier_search_reads_identifier_docs_from_index_and_uses_ca
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
   fetch_count = {"value": 0}
 
   def fake_query_fetch(texts: list[str], model: object) -> list[list[float]]:
@@ -35,7 +39,8 @@ def test_semantic_identifier_search_reads_identifier_docs_from_index_and_uses_ca
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="build widget function",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_query_fetch,
@@ -44,7 +49,8 @@ def test_semantic_identifier_search_reads_identifier_docs_from_index_and_uses_ca
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="build widget function",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_query_fetch,
@@ -71,7 +77,8 @@ def test_semantic_identifier_search_prefers_symbol_name_for_symbol_lookup(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="buildIndexMetadata",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_fetch_embeddings,
@@ -92,7 +99,8 @@ def test_semantic_identifier_search_prefers_signature_and_header_for_implementat
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="sqlite index refresh",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_fetch_embeddings,
@@ -113,7 +121,8 @@ def test_semantic_identifier_search_prefers_workflow_identifier_for_workflow_que
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="how refresh works",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_fetch_embeddings,
@@ -134,7 +143,8 @@ def test_semantic_identifier_search_exact_symbol_hit_wins_decisively(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="buildIndexMetadata",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_fetch_embeddings,
@@ -154,7 +164,8 @@ def test_semantic_identifier_search_normalized_symbol_hit_beats_related_neighbor
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="build index metadata",
-    model="test-model",
+    model=MODEL_SELECTOR,
+    provider=SEARCH_PROVIDER,
     top_k=3,
     depth_limit=3,
     embedding_fetcher=fake_fetch_embeddings,
@@ -171,7 +182,7 @@ def _build_identifier_runtime(tmp_path: Path):
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
   return runtime_settings
 
 
@@ -181,5 +192,5 @@ def _build_direct_hit_runtime(tmp_path: Path):
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
   return runtime_settings

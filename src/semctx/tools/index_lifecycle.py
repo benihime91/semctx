@@ -1,27 +1,32 @@
 """Index lifecycle helpers."""
 
 from pathlib import Path
+
 from beartype import beartype
+
 from semctx.config.runtime_settings import RuntimeSettings
-from semctx.core.embedding_provider import resolve_requested_embedding_provider
+from semctx.core.embedding_provider import EmbeddingProviderConfig, resolve_explicit_embedding_provider
 from semctx.core.embeddings import EmbeddingFetcher
 from semctx.core.index_manifest import plan_refresh
 from semctx.core.index_store import IndexStore
+from semctx.tools import index_db_paths
 from semctx.tools.index_building import build_metadata, collect_current_files
-from semctx.tools.index_lifecycle_state import (
-  inspect_existing_status,
-  rebuild_ready_index,
-  refresh_existing_index,
-)
+from semctx.tools.index_lifecycle_state import inspect_existing_status, rebuild_ready_index, refresh_existing_index
 from semctx.tools.index_status import IndexStatus, render_index_status
 
-INDEX_DB_NAME = "index.db"
-DEFAULT_INDEX_PROVIDER = "ollama"
+get_index_db_path = index_db_paths.get_index_db_path
+get_all_index_db_paths = index_db_paths.get_all_index_db_paths
+get_legacy_index_db_path = index_db_paths.get_legacy_index_db_path
+get_requested_index_db_path = index_db_paths.get_requested_index_db_path
+
 DEFAULT_INDEX_DEPTH_LIMIT = 64
 __all__ = [
   "clear_index",
   "ensure_search_ready_index",
+  "get_all_index_db_paths",
   "get_index_db_path",
+  "get_legacy_index_db_path",
+  "get_requested_index_db_path",
   "init_index",
   "refresh_index",
   "render_index_status",
@@ -30,9 +35,15 @@ __all__ = [
 
 
 @beartype
-def get_index_db_path(cache_dir: Path) -> Path:
-  """Return the SQLite path for the local search index."""
-  return cache_dir / INDEX_DB_NAME
+def _resolve_lifecycle_selection(
+  runtime_settings: RuntimeSettings,
+  provider_name: str | None,
+  model: str | None,
+) -> tuple[EmbeddingProviderConfig, Path]:
+  """Resolve the explicit provider/model selection and its DB path."""
+  provider = resolve_explicit_embedding_provider(provider_name, model)
+  db_path = get_index_db_path(runtime_settings.cache_dir, provider)
+  return provider, db_path
 
 
 @beartype
@@ -44,11 +55,7 @@ def init_index(
   fetcher: EmbeddingFetcher | None = None,
 ) -> IndexStatus:
   """Build a fresh local search index."""
-  provider = resolve_requested_embedding_provider(
-    provider_name=provider_name,
-    model=model,
-    default_provider=DEFAULT_INDEX_PROVIDER,
-  )
+  provider, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
   current_files = collect_current_files(runtime_settings.target_dir, depth_limit)
   return rebuild_ready_index(
     runtime_settings,
@@ -56,7 +63,7 @@ def init_index(
     build_metadata(runtime_settings.target_dir, provider),
     current_files,
     fetcher,
-    get_index_db_path(runtime_settings.cache_dir),
+    db_path,
   )
 
 
@@ -68,13 +75,12 @@ def status_index(
   depth_limit: int = DEFAULT_INDEX_DEPTH_LIMIT,
 ) -> IndexStatus:
   """Inspect current local index status."""
+  provider, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
   return inspect_existing_status(
     runtime_settings,
-    get_index_db_path(runtime_settings.cache_dir),
-    provider_name,
-    model,
+    db_path,
+    provider,
     depth_limit,
-    resolve_requested_embedding_provider,
   )
 
 
@@ -88,12 +94,8 @@ def refresh_index(
   fetcher: EmbeddingFetcher | None = None,
 ) -> IndexStatus:
   """Refresh the local index or require a full rebuild when needed."""
+  provider, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
   current_status = status_index(runtime_settings, provider_name, model, depth_limit)
-  provider = resolve_requested_embedding_provider(
-    provider_name=provider_name or current_status.provider,
-    model=model or current_status.model,
-    default_provider=current_status.provider or DEFAULT_INDEX_PROVIDER,
-  )
   current_files = collect_current_files(runtime_settings.target_dir, depth_limit)
   metadata = build_metadata(runtime_settings.target_dir, provider)
   if not current_status.exists and not full:
@@ -105,9 +107,9 @@ def refresh_index(
       metadata,
       current_files,
       fetcher,
-      get_index_db_path(runtime_settings.cache_dir),
+      db_path,
     )
-  store = IndexStore(get_index_db_path(runtime_settings.cache_dir))
+  store = IndexStore(db_path)
   refresh_plan = plan_refresh(
     stored_metadata=store.load_metadata(),
     expected_metadata=metadata,
@@ -124,7 +126,7 @@ def refresh_index(
     refresh_plan,
     provider,
     fetcher,
-    get_index_db_path(runtime_settings.cache_dir),
+    db_path,
   )
 
 
@@ -157,9 +159,19 @@ def ensure_search_ready_index(
 
 
 @beartype
-def clear_index(runtime_settings: RuntimeSettings) -> bool:
-  """Delete the local index database when it exists."""
-  db_path = get_index_db_path(runtime_settings.cache_dir)
+def clear_index(
+  runtime_settings: RuntimeSettings,
+  provider_name: str | None = None,
+  model: str | None = None,
+  clear_all: bool = False,
+) -> bool:
+  """Delete one explicit namespaced index database or all namespaced databases."""
+  if clear_all:
+    cleared_paths = get_all_index_db_paths(runtime_settings.cache_dir)
+    for db_path in cleared_paths:
+      db_path.unlink()
+    return bool(cleared_paths)
+  _, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
   if not db_path.exists():
     return False
   db_path.unlink()

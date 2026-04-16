@@ -1,5 +1,7 @@
 # semctx
 
+[![Codecov](https://codecov.io/gh/benihime91/semctx/graph/badge.svg)](https://app.codecov.io/gh/benihime91/semctx) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A semantic codebase discovery and search CLI. It provides repository discovery, indexed semantic search, and blast-radius analysis.
 
 > [!NOTE]

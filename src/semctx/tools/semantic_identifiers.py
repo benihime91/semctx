@@ -5,7 +5,7 @@ from pathlib import Path
 
 from beartype import beartype
 
-from semctx.core.embedding_provider import resolve_embedding_provider
+from semctx.core.embedding_provider import EmbeddingProviderConfig, resolve_embedding_provider
 from semctx.core.embeddings import (
   EmbeddingFetcher,
   fetch_embeddings,
@@ -14,7 +14,7 @@ from semctx.core.embeddings import (
 from semctx.tools.identifier_search_support import (
   dedupe_search_terms,
 )
-from semctx.tools.index_lifecycle import get_index_db_path
+from semctx.tools.index_lifecycle import get_index_db_path, get_legacy_index_db_path
 from semctx.tools.search_intent import classify_search_intent
 from semctx.tools.search_ranking import resolve_search_ranking_options
 from semctx.tools.search_result_diversity import promote_identifier_matches
@@ -49,6 +49,7 @@ def semantic_identifier_search(
   cache_dir: Path,
   query: str,
   model: str | None = None,
+  provider: EmbeddingProviderConfig | None = None,
   top_k: int = 5,
   depth_limit: int = 8,
   embedding_fetcher: EmbeddingFetcher | None = None,
@@ -61,6 +62,7 @@ def semantic_identifier_search(
       cache_dir: Cache directory that holds the local index.
       query: Search text to rank against indexed identifiers.
       model: Optional model override retained for API compatibility.
+      provider: Explicit provider/model selection for namespaced DB loading.
       top_k: Maximum number of matches to return.
       depth_limit: Unused retained argument for API compatibility.
       embedding_fetcher: Optional embedding fetcher override.
@@ -70,17 +72,23 @@ def semantic_identifier_search(
   """
   del target_dir, root_dir, model, depth_limit
   ranking_options = resolve_search_ranking_options(top_k=top_k)
-  store = load_index_store(get_index_db_path(cache_dir))
+  db_path = get_legacy_index_db_path(cache_dir) if provider is None else get_index_db_path(cache_dir, provider)
+  store = load_index_store(db_path)
   metadata = store.load_metadata()
   if metadata is None:
     raise FileNotFoundError("Index not found. Run `semctx index init` first.")
   identifiers = load_identifiers(store)
   if not identifiers:
     return []
-  provider = resolve_embedding_provider(metadata.provider, metadata.model)
+  if provider is None:
+    query_provider = resolve_embedding_provider(metadata.provider, metadata.model)
+  else:
+    if metadata.provider != provider.provider_name or metadata.model != provider.model:
+      raise ValueError("Selected provider/model does not match the targeted index metadata.")
+    query_provider = provider
   query_vector = get_cached_embeddings(
     cache_dir=cache_dir,
-    model=provider,
+    model=query_provider,
     texts=[query],
     fetcher=embedding_fetcher or fetch_embeddings,
   )[0]
