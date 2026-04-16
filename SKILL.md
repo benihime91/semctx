@@ -72,7 +72,7 @@ fail or use the wrong embedding backend.
 
 - `gemini/...`
   - Export `GEMINI_API_KEY` in the shell or agent runtime.
-  - Example: `gemini/text-embedding-004`
+  - Example: `gemini/gemini-embedding-2-preview`
 
 - `vertex_ai/...`
   - Ensure the runtime includes semctx's LiteLLM + Google auth dependencies.
@@ -87,7 +87,7 @@ fail or use the wrong embedding backend.
 | Provider example                        | What the user must set up                                             |
 | --------------------------------------- | --------------------------------------------------------------------- |
 | `ollama/nomic-embed-text-v2-moe:latest` | Install Ollama, start the local service, and pull the embedding model |
-| `gemini/text-embedding-004`             | Set `GEMINI_API_KEY` in the runtime environment                       |
+| `gemini/gemini-embedding-2-preview`     | Set `GEMINI_API_KEY` in the runtime environment                       |
 | `vertex_ai/gemini-embedding-2-preview`  | Provide Google auth env vars and a runtime with Google auth support   |
 
 ### Agent rule
@@ -140,13 +140,15 @@ functions) before reading its full source.
 
 ### 3. `index` — Build and maintain the search index
 
-Subcommands that manage the local SQLite index at `<cache-dir>/index.db`.
+Subcommands that manage the local SQLite index under
+`<cache-dir>/embeddings/<provider_model_namespace>/index.db`.
 
 ```bash
 semctx index init   [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit N]
 semctx index status [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit N]
 semctx index refresh [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit N] [--full]
-semctx index clear
+semctx index clear  --model PROVIDER/MODEL
+semctx index clear  --all
 ```
 
 | Subcommand | Purpose                                                  |
@@ -154,15 +156,20 @@ semctx index clear
 | `init`     | Build a fresh index from scratch                         |
 | `status`   | Show indexed file count, model, staleness                |
 | `refresh`  | Incrementally update; `--full` forces a complete rebuild |
-| `clear`    | Delete the index database                                |
+| `clear`    | Delete one selected index DB or all namespaced DBs       |
 
 The `--model` flag accepts `provider/model` strings (e.g.
-`ollama/nomic-embed-text-v2-moe:latest`, `gemini/text-embedding-004`,
+`ollama/nomic-embed-text-v2-moe:latest`,
+`gemini/gemini-embedding-2-preview`,
 `vertex_ai/gemini-embedding-2-preview`).
 
+`index init`, `index status`, `index refresh`, `search-code`, and
+`search-identifiers` now require an explicit `--model provider/model`.
+`index clear` requires either `--model provider/model` or `--all`.
+
 **Auto-index**: `search-code` and `search-identifiers` automatically run
-`init` or `refresh` when needed, so explicit index management is optional
-unless you want control over model selection or timing.
+`init` or `refresh` when needed, but they still require an explicit
+`--model provider/model` so semctx opens the correct namespaced index.
 
 **If auto-recovery is not enough:** When a command still fails or status shows
 **stale**, run `semctx index refresh` with the same `--target-dir`,
@@ -180,13 +187,13 @@ lexical scoring.
 semctx search-code QUERY [--top-k N] [--model PROVIDER/MODEL] [--target-dir PATH] [--depth-limit N]
 ```
 
-| Arg / Option    | Default       | Notes                             |
-| --------------- | ------------- | --------------------------------- |
-| `QUERY`         | required      | Natural-language or keyword query |
-| `--top-k`       | `5`           | Max results                       |
-| `--model`       | index default | Override embedding model          |
-| `--target-dir`  | `.`           | Scope the search root             |
-| `--depth-limit` | `8`           | Directory depth limit             |
+| Arg / Option    | Default     | Notes                             |
+| --------------- | ----------- | --------------------------------- |
+| `QUERY`         | required    | Natural-language or keyword query |
+| `--top-k`       | `5`         | Max results                       |
+| `--model`       | required    | Required embedding model selector |
+| `--target-dir`  | `.`         | Scope the search root             |
+| `--depth-limit` | `8`         | Directory depth limit             |
 
 **JSON payload keys**: `command`, `query`, `matches[]` (each with
 `relative_path`, `start_line`, `end_line`, `score`, `semantic_score`,
@@ -252,7 +259,7 @@ most important ones.
 ### Find and understand code
 
 ```bash
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication middleware" --top-k 5
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication middleware" --top-k 5 --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
 Read the `matches[].relative_path` and `start_line`/`end_line` to locate
@@ -261,7 +268,7 @@ relevant source. Use the `snippet` field for a quick preview.
 ### Find a specific symbol
 
 ```bash
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "database connection pool" --top-k 3
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "database connection pool" --top-k 3 --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
 Each match includes `kind` (function/class/variable), `name`, and `signature`.
@@ -281,10 +288,10 @@ Check `usages[]` length and file distribution to gauge the blast radius.
 semctx --json tree --depth-limit 2
 
 # 2. Search for the feature area
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "payment processing" --top-k 5
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "payment processing" --top-k 5 --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # 3. Find the key function
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "process_payment" --top-k 3
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "process_payment" --top-k 3 --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # 4. Check what breaks if you change it
 semctx --json blast-radius "process_payment" "backend/payments/service.py"
@@ -306,6 +313,8 @@ JSON errors have this shape:
 
 Common error codes:
 
+- `explicit_model_required` — rerun the command with an explicit
+  `--model provider/model` selector.
 - `index_not_found` — run `semctx index init` (with the same `--target-dir`, `--cache-dir`, and `--model` you use for search), then **retry** the command that failed.
 - `full_rebuild_required` — run `semctx index refresh --full` with the same `--target-dir`, `--cache-dir`, and `--model`, then **retry** the original command. Do not stop after refresh; always re-run search or the workflow step once the rebuild finishes.
 
@@ -322,14 +331,14 @@ The `--model` flag uses `provider/model` format:
 | Provider    | Example                                 | Notes                                                                           |
 | ----------- | --------------------------------------- | ------------------------------------------------------------------------------- |
 | `ollama`    | `ollama/nomic-embed-text-v2-moe:latest` | Requires a running local Ollama service and the embedding model pulled locally  |
-| `gemini`    | `gemini/text-embedding-004`             | Requires `GEMINI_API_KEY`                                                       |
+| `gemini`    | `gemini/gemini-embedding-2-preview`     | Requires `GEMINI_API_KEY`                                                       |
 | `vertex_ai` | `vertex_ai/gemini-embedding-2-preview`  | Requires Google auth env vars plus a runtime with LiteLLM + Google auth support |
 
-If `--model` is omitted, the index uses whatever model it was originally built
-with. For reliable agent use, users should still configure and document their
-preferred default model in the `Default model configuration` section above so
-the agent knows which provider/model to use when it has to build or refresh an
-index.
+Indexed semctx commands require an explicit `--model provider/model`. For
+reliable agent use, users should still configure and document their preferred
+default model in the `Default model configuration` section above so the agent
+knows which provider/model to pass every time it builds, refreshes, checks, or
+searches an index.
 
 For `ollama`, make sure:
 
@@ -359,8 +368,12 @@ If `VERTEX_LOCATION` is unset or set to `global`, semctx normalizes it to
 
 ## Key Behaviors
 
-- The index lives at `<target-dir>/.semctx/index.db` by default.
+- The index lives under
+  `<target-dir>/.semctx/embeddings/<provider_model_namespace>/index.db` by
+  default.
 - `.gitignore` and `.ignore` files control which files are walked and indexed.
+- Indexed commands require explicit `--model provider/model`; semctx does not
+  silently choose a provider/model or shared index DB.
 - Search commands auto-init/refresh the index when safe; they fail with
   `full_rebuild_required` if schema or metadata is incompatible — then you
   must run `index refresh --full` and **retry**; for **stale** indexes, run
