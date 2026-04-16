@@ -14,6 +14,22 @@ uv tool install git+https://github.com/benihime91/semctx.git
 uv tool install git+https://github.com/benihime91/semctx.git@v0.1.0
 ```
 
+### Using `SKILL.md` with AI agents
+
+> For AI AGENTS:
+> Install [semctx](https://github.com/benihime91/semctx/tree/main). Add the upstream skill from [SKILL.md](https://raw.githubusercontent.com/benihime91/semctx/refs/heads/main/SKILL.md) in your current installation. Before finalising the skill install make sure that you ask the user for the default model and provide options to choose from. Once installed verify the skill works.
+
+If your agent platform supports repo-local skill or instruction files, point it
+at `SKILL.md` in the repository root.
+
+The exact wiring depends on the agent framework, but the intended setup is:
+
+- make `semctx` available on `PATH`
+- prefer `semctx --json` for programmatic and agent-driven calls
+- pass `--target-dir` to define the content scope for indexing and search
+- pass `--cache-dir` to control where `index.db` and embedding artifacts live
+- configure a default model in `SKILL.md`, then pass overrides only as `--model provider/model`
+
 ## Required: choose a default embedding model
 
 Before you use indexed semctx commands through an LLM or AI agent, choose a
@@ -58,29 +74,6 @@ At minimum, set:
 Your AI agents should use that configured default model for `index init`,
 `index refresh`, `search-code`, and `search-identifiers` unless you explicitly
 override it with `--model provider/model`.
-
-### Using `SKILL.md` with AI agents
-
-If your agent platform supports repo-local skill or instruction files, point it
-at `SKILL.md` in the repository root.
-
-The exact wiring depends on the agent framework, but the intended setup is:
-
-- make `semctx` available on `PATH`
-- prefer `semctx --json` for programmatic and agent-driven calls
-- pass `--target-dir` to define the content scope for indexing and search
-- pass `--cache-dir` to control where `index.db` and embedding artifacts live
-- configure a default model in `SKILL.md`, then pass overrides only as `--model provider/model`
-
-Minimal agent-friendly examples:
-
-```bash
-# Search a backend directory with machine-readable output
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "order retry logic" --model "ollama/nomic-embed-text-v2-moe:latest"
-
-# Search identifiers the same way
-semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "create payment service" --model "vertex_ai/gemini-embedding-2-preview"
-```
 
 ## Development Checks
 
