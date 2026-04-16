@@ -9,9 +9,6 @@ A semantic codebase discovery and search CLI. It provides repository discovery, 
 
 - [Installation](#installation)
   - [Embedding providers](#embedding-providers)
-    - [Ollama embeddings](#ollama-embeddings)
-    - [Gemini embeddings](#gemini-embeddings)
-    - [Vertex AI embeddings](#vertex-ai-embeddings)
   - [Using SKILL.md with AI agents](#using-skillmd-with-ai-agents)
     - [Cursor](#cursor)
     - [OpenCode](#opencode)
