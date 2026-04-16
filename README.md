@@ -77,6 +77,8 @@ Install commands and environment variables for each backend are in the sections 
 
 ### Ollama embeddings
 
+<details>
+<summary>Ollama embeddings</summary>
 If your default `--model` uses the `ollama/` prefix (for example `ollama/nomic-embed-text-v2-moe:latest`), install and run [Ollama](https://ollama.com/) on the same machine (or network-reachable host) that will execute `semctx`, then pull the **exact** embedding model name you pass to `--model`:
 
 ```bash
@@ -96,8 +98,12 @@ Optional environment variables (only when your Ollama API is not on the default 
 export OLLAMA_API_BASE="http://127.0.0.1:11434"
 ```
 
+</details>
+
 **Gemini embeddings** — `GEMINI_API_KEY`
 
+<details>
+<summary>Gemini embeddings</summary>
 ### Gemini embeddings
 
 If your default `--model` uses the `gemini/` prefix, set an API key in every shell, CI job, or agent runtime that runs `semctx`:
@@ -106,8 +112,12 @@ If your default `--model` uses the `gemini/` prefix, set an API key in every she
 export GEMINI_API_KEY="your-api-key"
 ```
 
+</details>
+
 **Vertex AI embeddings** — `GOOGLE_`\_ / `VERTEX\__` env vars
 
+<details>
+<summary>Vertex AI embeddings</summary>
 ### Vertex AI embeddings
 
 If your default `--model` uses the `vertex_ai/` prefix, point LiteLLM at Google Cloud with application-default credentials (or a service account) plus project and region. `semctx` maps these into the env names LiteLLM expects; unset or `global` `VERTEX_LOCATION` is normalized to `us-central1`.
@@ -117,6 +127,8 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project"
 export VERTEX_LOCATION="us-central1"
 ```
+
+</details>
 
 ### Using `SKILL.md` with AI agents
 
