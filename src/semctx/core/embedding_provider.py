@@ -8,7 +8,7 @@ from beartype import beartype
 
 _DEFAULT_MODELS = {
     "ollama": "nomic-embed-text-v2-moe:latest",
-    "gemini": "text-embedding-004",
+    "gemini": "gemini-embedding-2-preview",
     "vertex_ai": "gemini-embedding-2-preview",
 }
 

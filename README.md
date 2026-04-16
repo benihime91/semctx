@@ -1,17 +1,12 @@
 # semctx
 
-A semantic codebase discovery and search CLI.
-
-`semctx` is a Python port of the core Context+ product. It provides repository discovery, indexed semantic search, and blast-radius analysis.
+A semantic codebase discovery and search CLI. It provides repository discovery, indexed semantic search, and blast-radius analysis.
 
 ## Installation
 
-Use `uv` for local development, or install `semctx` as a tool from GitHub:
+Install `semctx` as a `uv` tool from GitHub:
 
 ```bash
-# Local development: run directly in the project
-uv run semctx --help
-
 # Install from the GitHub repo
 uv tool install git+https://github.com/benihime91/semctx.git
 
@@ -34,7 +29,7 @@ environment is missing, agent-driven semctx calls will be unreliable.
 Use full `provider/model` strings with the shipped CLI:
 
 - `ollama/nomic-embed-text-v2-moe:latest`
-- `gemini/text-embedding-004`
+- `gemini/gemini-embedding-2-preview`
 - `vertex_ai/gemini-embedding-2-preview`
 
 ### Provider requirements
@@ -42,7 +37,7 @@ Use full `provider/model` strings with the shipped CLI:
 | Provider example                        | Required setup                                                                                                                                                      |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ollama/nomic-embed-text-v2-moe:latest` | Install Ollama, start the local Ollama service, and pull the embedding model before running `semctx`.                                                               |
-| `gemini/text-embedding-004`             | Export `GEMINI_API_KEY` in the shell, CI job, or agent runtime that will execute `semctx`.                                                                          |
+| `gemini/gemini-embedding-2-preview`     | Export `GEMINI_API_KEY` in the shell, CI job, or agent runtime that will execute `semctx`.                                                                          |
 | `vertex_ai/gemini-embedding-2-preview`  | Export `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `VERTEX_LOCATION`. Use a runtime with semctx's LiteLLM and Google auth dependencies available. |
 
 For `vertex_ai`, semctx normalizes an unset or `global` `VERTEX_LOCATION` to
@@ -71,7 +66,7 @@ at `SKILL.md` in the repository root.
 
 The exact wiring depends on the agent framework, but the intended setup is:
 
-- make `semctx` available on `PATH`, or run it through `uv run semctx`
+- make `semctx` available on `PATH`
 - prefer `semctx --json` for programmatic and agent-driven calls
 - pass `--target-dir` to define the content scope for indexing and search
 - pass `--cache-dir` to control where `index.db` and embedding artifacts live
@@ -80,11 +75,11 @@ The exact wiring depends on the agent framework, but the intended setup is:
 Minimal agent-friendly examples:
 
 ```bash
-# Search a scoped directory with machine-readable output
-uv run semctx --json --target-dir "src/" --cache-dir ".semctx" search-code "index lifecycle" --model "ollama/nomic-embed-text-v2-moe:latest"
+# Search a backend directory with machine-readable output
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "order retry logic" --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Search identifiers the same way
-uv run semctx --json --target-dir "src/" --cache-dir ".semctx" search-identifiers "build index metadata" --model "vertex_ai/gemini-embedding-2-preview"
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "create payment service" --model "vertex_ai/gemini-embedding-2-preview"
 ```
 
 ## Development Checks
@@ -93,41 +88,41 @@ Install dev dependencies and wire up the local git hooks:
 
 ```bash
 uv sync --dev
-uv run pre-commit install
+pre-commit install
 ```
 
 Validate the hook config or run the approved fast-core profile on demand:
 
 ```bash
-uv run pre-commit validate-config
-uv run pre-commit run --all-files
-uv run ruff check src/semctx
-uv run ty check src/semctx
-uv run python -m compileall "src/semctx"
+pre-commit validate-config
+pre-commit run --all-files
+ruff check src/semctx
+ty check src/semctx
+python -m compileall "src/semctx"
 ```
 
 The pre-commit profile stays intentionally small: fast file-hygiene hooks, Astral's official `uv-lock` hook, plus local `ruff check src/semctx`, `ty check src/semctx`, and `python -m compileall "src/semctx"` checks.
 
 ## Quick Start
 
-Explore your repository structure and semantics:
+Explore a repository subtree and its semantics:
 
 ```bash
 # Build the local index for the directory you want to search
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # View the structural tree of that directory
-uv run semctx tree src/ --depth-limit 2
+semctx tree backend/ --depth-limit 2
 
 # Search indexed code and docs by meaning
-uv run semctx --target-dir "src/" --cache-dir ".semctx" search-code "user authentication" --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication" --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
 Use `--json` before the command when you want machine-readable output:
 
 ```bash
-uv run semctx --json tree src/ --depth-limit 2
-uv run semctx --json --target-dir "src/" --cache-dir ".semctx" search-code "user authentication" --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --json tree backend/ --depth-limit 2
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication" --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
 ### Scope Model
@@ -136,7 +131,7 @@ uv run semctx --json --target-dir "src/" --cache-dir ".semctx" search-code "user
 - `--cache-dir` is only where `semctx` stores `index.db` and related artifacts.
 - `--depth-limit` is optional narrowing for traversal-heavy commands. It does not change scope identity.
 
-If you want to search only `src/`, point `--target-dir` at `src/`. Files outside `src/`, such as a repo-root `README.md`, are outside scope.
+If you want to search only `backend/`, point `--target-dir` at `backend/`. Files outside that directory, such as a repo-root `README.md`, are outside scope.
 
 ## Supported Languages
 
@@ -177,10 +172,10 @@ Understand file structure and API surfaces without reading full implementations.
 
 ```bash
 # Show file headers, functions, and classes
-uv run semctx tree src/ --include-symbols
+semctx tree backend/ --include-symbols
 
 # View the API surface of a specific file
-uv run semctx skeleton src/semctx/core/embeddings.py
+semctx skeleton backend/payments/service.py
 ```
 
 ### Semantic Search
@@ -189,10 +184,10 @@ Search your indexed codebase by meaning. Embeddings are provided via `litellm` a
 
 ```bash
 # Find files related to a concept
-uv run semctx --target-dir "src/" --cache-dir ".semctx" search-code "how are transactions signed" --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" search-code "how are transactions signed" --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Search by identifier intent
-uv run semctx --target-dir "src/" --cache-dir ".semctx" search-identifiers "password hashing" --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" search-identifiers "password hashing" --model "ollama/nomic-embed-text-v2-moe:latest"
 ```
 
 Normal search runs recover the local index when the safe fix is obvious:
@@ -214,12 +209,12 @@ asks for another model.
 
 ```bash
 # Local Ollama embeddings
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
-uv run semctx --target-dir "src/" --cache-dir ".semctx" search-code "retry policy" --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" search-code "retry policy" --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Vertex AI embeddings
-uv run semctx --target-dir "src/" --cache-dir ".semctx-vertex" index init --model "vertex_ai/gemini-embedding-2-preview"
-uv run semctx --target-dir "src/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
+semctx --target-dir "backend/" --cache-dir ".semctx-vertex" index init --model "vertex_ai/gemini-embedding-2-preview"
+semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
 ```
 
 Provider notes:
@@ -249,20 +244,20 @@ export VERTEX_LOCATION="us-central1"
 The indexed search flow is explicit. Use `--target-dir` to choose what content belongs in the index and `--cache-dir` to choose where the index artifacts live:
 
 ```bash
-# Create the SQLite index for src/
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
+# Create the SQLite index for backend/
+semctx --target-dir "backend/" --cache-dir ".semctx" index init --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Inspect whether the index is ready, stale, or needs rebuild
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index status --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" index status --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Apply incremental updates for added, changed, or removed files
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index refresh --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" index refresh --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Rebuild from scratch when metadata changes require it
-uv run semctx --target-dir "src/" --cache-dir ".semctx" index refresh --full --model "ollama/nomic-embed-text-v2-moe:latest"
+semctx --target-dir "backend/" --cache-dir ".semctx" index refresh --full --model "ollama/nomic-embed-text-v2-moe:latest"
 
 # Remove the local index database
-uv run semctx --cache-dir ".semctx" index clear
+semctx --cache-dir ".semctx" index clear
 ```
 
 Lifecycle behavior:
@@ -280,5 +275,5 @@ Trace symbol usage across your codebase before deleting or refactoring.
 
 ```bash
 # Find every usage of 'fetch_embedding' outside of its defining file
-uv run semctx blast-radius fetch_embedding src/semctx/core/embeddings.py
+semctx blast-radius fetch_embedding src/semctx/core/embeddings.py
 ```

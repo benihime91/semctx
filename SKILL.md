@@ -25,9 +25,6 @@ deterministic.
 ```bash
 # If installed as a uv tool
 semctx <command> [options]
-
-# From the repo without installing
-uv run semctx <command> [options]
 ```
 
 ## Global Options
@@ -229,7 +226,7 @@ reference it and where. Essential for assessing change impact.
 
 ```bash
 semctx --json tree --depth-limit 3
-semctx --json skeleton src/main.py
+semctx --json skeleton backend/app.py
 ```
 
 Parse the JSON `files[]` array to identify key modules, then `skeleton` the
@@ -238,7 +235,7 @@ most important ones.
 ### Find and understand code
 
 ```bash
-semctx --json --target-dir "src/" --cache-dir ".semctx" search-code "user authentication middleware" --top-k 5
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "user authentication middleware" --top-k 5
 ```
 
 Read the `matches[].relative_path` and `start_line`/`end_line` to locate
@@ -247,7 +244,7 @@ relevant source. Use the `snippet` field for a quick preview.
 ### Find a specific symbol
 
 ```bash
-semctx --json --target-dir "src/" --cache-dir ".semctx" search-identifiers "database connection pool" --top-k 3
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "database connection pool" --top-k 3
 ```
 
 Each match includes `kind` (function/class/variable), `name`, and `signature`.
@@ -255,7 +252,7 @@ Each match includes `kind` (function/class/variable), `name`, and `signature`.
 ### Assess refactoring impact
 
 ```bash
-semctx --json blast-radius "build_runtime_settings" "src/semctx/config/runtime_settings.py"
+semctx --json blast-radius "process_payment" "backend/payments/service.py"
 ```
 
 Check `usages[]` length and file distribution to gauge the blast radius.
@@ -267,13 +264,13 @@ Check `usages[]` length and file distribution to gauge the blast radius.
 semctx --json tree --depth-limit 2
 
 # 2. Search for the feature area
-semctx --json --target-dir "src/" --cache-dir ".semctx" search-code "payment processing" --top-k 5
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-code "payment processing" --top-k 5
 
 # 3. Find the key function
-semctx --json --target-dir "src/" --cache-dir ".semctx" search-identifiers "process_payment" --top-k 3
+semctx --json --target-dir "backend/" --cache-dir ".semctx" search-identifiers "process_payment" --top-k 3
 
 # 4. Check what breaks if you change it
-semctx --json blast-radius "process_payment" "src/billing/payments.py"
+semctx --json blast-radius "process_payment" "backend/payments/service.py"
 ```
 
 ---

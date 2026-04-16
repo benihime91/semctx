@@ -27,9 +27,9 @@ def test_resolve_embedding_provider_supports_ollama_and_gemini() -> None:
     )
     assert gemini == EmbeddingProviderConfig(
         provider_name="gemini",
-        model="text-embedding-004",
-        litellm_model="gemini/text-embedding-004",
-        cache_namespace="gemini_text-embedding-004",
+        model="gemini-embedding-2-preview",
+        litellm_model="gemini/gemini-embedding-2-preview",
+        cache_namespace="gemini_gemini-embedding-2-preview",
         env_overrides={},
     )
 
