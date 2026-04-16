@@ -43,5 +43,20 @@ packages = ["src/semctx"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+known-first-party = ["semctx"]
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
+
 [tool.ruff]
-extend-exclude = [".mcp_data"]
+src = ["semctx"]
+line-length = 180
+indent-width = 2
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

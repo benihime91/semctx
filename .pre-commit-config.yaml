@@ -26,20 +26,26 @@ repos:
     hooks:
       - id: uv-lock
 
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.24.1
+    hooks:
+      - id: validate-pyproject
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.5
+    hooks:
+      - id: ruff-check
+        # Run the linter.
+        args: [--output-format, github, --fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+        require_serial: true
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [python, pyi]
+
   - repo: local
     hooks:
-      - id: ruff-check-src-semctx
-        name: ruff check src/semctx
-        entry: uv run ruff check src/semctx
-        language: system
-        pass_filenames: false
       - id: ty
         name: ty check
         entry: uv run ty check src/semctx
-        language: system
-        pass_filenames: false
-      - id: compileall-src-semctx
-        name: python compileall src/semctx
-        entry: uv run python -m compileall "src/semctx"
         language: system
         pass_filenames: false

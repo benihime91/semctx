@@ -7,11 +7,11 @@ from beartype import beartype
 
 SCHEMA_VERSION = "3"
 REQUIRED_TABLE_NAMES = (
-    "index_metadata",
-    "indexed_files",
-    "code_chunks",
-    "identifier_docs",
-    "embeddings",
+  "index_metadata",
+  "indexed_files",
+  "code_chunks",
+  "identifier_docs",
+  "embeddings",
 )
 
 _SCHEMA_SQL = """
@@ -74,28 +74,28 @@ CREATE TABLE IF NOT EXISTS identifier_docs (
 
 @beartype
 def ensure_index_schema(db_path: Path) -> None:
-    """Create the local index schema when it does not exist."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as connection:
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.executescript(_SCHEMA_SQL)
-        connection.execute(
-            "INSERT OR IGNORE INTO index_metadata(key, value) VALUES (?, ?)",
-            ("schema_version", SCHEMA_VERSION),
-        )
-        connection.commit()
+  """Create the local index schema when it does not exist."""
+  db_path.parent.mkdir(parents=True, exist_ok=True)
+  with sqlite3.connect(db_path) as connection:
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.executescript(_SCHEMA_SQL)
+    connection.execute(
+      "INSERT OR IGNORE INTO index_metadata(key, value) VALUES (?, ?)",
+      ("schema_version", SCHEMA_VERSION),
+    )
+    connection.commit()
 
 
 @beartype
 def get_schema_version(db_path: Path) -> str | None:
-    """Read the stored schema version when available."""
-    if not db_path.exists():
-        return None
-    with sqlite3.connect(db_path) as connection:
-        row = connection.execute(
-            "SELECT value FROM index_metadata WHERE key = ?",
-            ("schema_version",),
-        ).fetchone()
-    if row is None:
-        return None
-    return str(row[0])
+  """Read the stored schema version when available."""
+  if not db_path.exists():
+    return None
+  with sqlite3.connect(db_path) as connection:
+    row = connection.execute(
+      "SELECT value FROM index_metadata WHERE key = ?",
+      ("schema_version",),
+    ).fetchone()
+  if row is None:
+    return None
+  return str(row[0])

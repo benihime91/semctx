@@ -10,8 +10,8 @@ __version__ = "0.1.0"
 
 @beartype
 def get_version() -> str:
-    """Return the installed package version or fallback version."""
-    try:
-        return version(PACKAGE_NAME)
-    except PackageNotFoundError:
-        return __version__
+  """Return the installed package version or fallback version."""
+  try:
+    return version(PACKAGE_NAME)
+  except PackageNotFoundError:
+    return __version__
