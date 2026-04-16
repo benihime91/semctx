@@ -1,6 +1,5 @@
 """State helpers for index lifecycle flows."""
 
-from collections.abc import Callable
 from pathlib import Path
 
 from beartype import beartype
@@ -63,10 +62,8 @@ def rebuild_ready_index(
 def inspect_existing_status(
   runtime_settings: RuntimeSettings,
   db_path: Path,
-  provider_name: str | None,
-  model: str | None,
+  provider: EmbeddingProviderConfig,
   depth_limit: int,
-  resolve_provider: Callable[..., EmbeddingProviderConfig],
 ) -> IndexStatus:
   """Build status for an existing or missing index database."""
   store = load_store(db_path)
@@ -75,11 +72,6 @@ def inspect_existing_status(
   stored_metadata = store.load_metadata()
   if stored_metadata is None:
     return missing_index_status(db_path)
-  provider = resolve_provider(
-    provider_name=provider_name or stored_metadata.provider,
-    model=model or stored_metadata.model,
-    default_provider=stored_metadata.provider,
-  )
   refresh_plan = plan_refresh(
     stored_metadata=stored_metadata,
     expected_metadata=build_metadata(runtime_settings.target_dir, provider),

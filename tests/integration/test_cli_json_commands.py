@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from semctx.cli import app
+from semctx.core.embedding_provider import resolve_explicit_embedding_provider
 from semctx.tools.index_lifecycle import get_index_db_path
 from semctx.commands import search_code_command, search_identifiers_command
 from semctx.tools.index_status import IndexStatus
@@ -14,6 +15,8 @@ from semctx.tools.semantic_identifiers import IdentifierSearchMatch
 from semctx.tools.semantic_search import CodeSearchMatch
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "demo_project"
+MODEL_SELECTOR = "ollama/test-model"
+INDEX_MODEL_SELECTOR = "ollama/nomic-embed-text-v2-moe:latest"
 
 
 def test_search_commands_emit_json(monkeypatch) -> None:
@@ -106,12 +109,12 @@ def test_search_commands_emit_json(monkeypatch) -> None:
   runner = CliRunner()
   code_result = runner.invoke(
     app,
-    ["--json", "search-code", "greeting flow", "--model", "test-model"],
+    ["--json", "search-code", "greeting flow", "--model", MODEL_SELECTOR],
     prog_name="semctx",
   )
   identifiers_result = runner.invoke(
     app,
-    ["--json", "search-identifiers", "build widget", "--model", "test-model"],
+    ["--json", "search-identifiers", "build widget", "--model", MODEL_SELECTOR],
     prog_name="semctx",
   )
 
@@ -282,7 +285,7 @@ def test_search_commands_inherit_root_target_dir_in_json(monkeypatch) -> None:
       "search-code",
       "greeting flow",
       "--model",
-      "test-model",
+      MODEL_SELECTOR,
     ],
     prog_name="semctx",
   )
@@ -291,6 +294,35 @@ def test_search_commands_inherit_root_target_dir_in_json(monkeypatch) -> None:
 
   assert result.exit_code == 0
   assert payload["target_dir"] == "src"
+
+
+def test_command_json_errors_distinguish_explicit_model_requirement(tmp_path: Path) -> None:
+  _write_index_fixture(tmp_path)
+  runner = CliRunner()
+  base_args = ["--json", "--cache-dir", str(tmp_path / ".semctx")]
+
+  code_result = runner.invoke(app, ["--json", "search-code", "greeting flow"], prog_name="semctx")
+  identifiers_result = runner.invoke(app, ["--json", "search-identifiers", "build widget"], prog_name="semctx")
+  index_status_result = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path)], prog_name="semctx")
+  clear_result = runner.invoke(app, [*base_args, "index", "clear"], prog_name="semctx")
+
+  code_payload = json.loads(code_result.stdout)
+  identifiers_payload = json.loads(identifiers_result.stdout)
+  index_status_payload = json.loads(index_status_result.stdout)
+  clear_payload = json.loads(clear_result.stdout)
+
+  assert code_result.exit_code == 1
+  assert code_payload["error"] == "explicit_model_required"
+  assert "--model provider/model is required for `search-code`" in code_payload["message"]
+  assert identifiers_result.exit_code == 1
+  assert identifiers_payload["error"] == "explicit_model_required"
+  assert "--model provider/model is required for `search-identifiers`" in identifiers_payload["message"]
+  assert index_status_result.exit_code == 1
+  assert index_status_payload["error"] == "explicit_model_required"
+  assert "--model provider/model is required for `index status`" in index_status_payload["message"]
+  assert clear_result.exit_code == 1
+  assert clear_payload["error"] == "explicit_model_required"
+  assert "`index clear` requires `--model provider/model` or explicit `--all`" in clear_payload["message"]
 
 
 def test_index_status_emits_rebuild_required_json(tmp_path: Path, monkeypatch) -> None:
@@ -315,14 +347,20 @@ def test_index_status_emits_rebuild_required_json(tmp_path: Path, monkeypatch) -
       "--target-dir",
       str(tmp_path),
       "--model",
-      "ollama/nomic-embed-text-v2-moe:latest",
+      INDEX_MODEL_SELECTOR,
     ],
     prog_name="semctx",
   )
-  _set_schema_version(get_index_db_path(tmp_path / ".semctx"), "2")
+  _set_schema_version(
+    get_index_db_path(
+      tmp_path / ".semctx",
+      resolve_explicit_embedding_provider(None, INDEX_MODEL_SELECTOR),
+    ),
+    "2",
+  )
   status_result = runner.invoke(
     app,
-    [*base_args, "index", "status", "--target-dir", str(tmp_path)],
+    [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", INDEX_MODEL_SELECTOR],
     prog_name="semctx",
   )
 
@@ -351,6 +389,31 @@ def test_index_status_emits_rebuild_required_json(tmp_path: Path, monkeypatch) -
   assert payload["status"]["rebuild_required"] is True
   assert payload["status"]["stale"] is True
   assert payload["status"]["changed_paths"] == ["app/main.py"]
+
+
+def test_index_commands_emit_invalid_argument_json_for_invalid_model_selector(tmp_path: Path) -> None:
+  _write_index_fixture(tmp_path)
+  runner = CliRunner()
+  base_args = ["--json", "--cache-dir", str(tmp_path / ".semctx")]
+
+  init_result = runner.invoke(
+    app,
+    [*base_args, "index", "init", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  status_result = runner.invoke(
+    app,
+    [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--model", "invalid-selector"], prog_name="semctx")
+
+  for result in (init_result, status_result, clear_result):
+    payload = json.loads(result.stdout)
+    assert result.exit_code == 1
+    assert payload["command"] == "index"
+    assert payload["error"] == "invalid_arguments"
+    assert payload["message"] == "Embedding provider is required when selecting an index database explicitly."
 
 
 def _write_index_fixture(root_dir: Path) -> None:

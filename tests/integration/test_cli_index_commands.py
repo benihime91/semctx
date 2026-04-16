@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 
 from semctx.cli import app
 
+MODEL_SELECTOR = "ollama/nomic-embed-text-v2-moe:latest"
+
 
 def test_index_help_lists_init_status_refresh_and_clear() -> None:
   runner = CliRunner()
@@ -46,30 +48,18 @@ def test_index_commands_run_full_lifecycle(tmp_path: Path, monkeypatch) -> None:
       "--target-dir",
       str(tmp_path),
       "--model",
-      "ollama/nomic-embed-text-v2-moe:latest",
+      MODEL_SELECTOR,
     ],
     prog_name="semctx",
   )
-  stale_free_status = runner.invoke(
-    app,
-    [*base_args, "index", "status", "--target-dir", str(tmp_path)],
-    prog_name="semctx",
-  )
+  stale_free_status = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", MODEL_SELECTOR], prog_name="semctx")
   (tmp_path / "app" / "main.py").write_text(
     'class Greeter:\n    def greet(self) -> str:\n        return "hello"\n',
     encoding="utf-8",
   )
-  stale_status = runner.invoke(
-    app,
-    [*base_args, "index", "status", "--target-dir", str(tmp_path)],
-    prog_name="semctx",
-  )
-  refresh_result = runner.invoke(
-    app,
-    [*base_args, "index", "refresh", "--target-dir", str(tmp_path)],
-    prog_name="semctx",
-  )
-  clear_result = runner.invoke(app, [*base_args, "index", "clear"], prog_name="semctx")
+  stale_status = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", MODEL_SELECTOR], prog_name="semctx")
+  refresh_result = runner.invoke(app, [*base_args, "index", "refresh", "--target-dir", str(tmp_path), "--model", MODEL_SELECTOR], prog_name="semctx")
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--model", MODEL_SELECTOR], prog_name="semctx")
 
   assert init_result.exit_code == 0
   assert "Index initialized." in init_result.stdout
@@ -106,6 +96,80 @@ def test_index_init_rejects_removed_provider_flag(tmp_path: Path) -> None:
   )
 
   assert result.exit_code == 2
+
+
+def test_index_commands_require_explicit_model_or_all(tmp_path: Path) -> None:
+  _write_project(tmp_path)
+  runner = CliRunner()
+  base_args = ["--cache-dir", str(tmp_path / ".semctx")]
+
+  status_result = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path)], prog_name="semctx")
+  init_result = runner.invoke(app, [*base_args, "index", "init", "--target-dir", str(tmp_path)], prog_name="semctx")
+  refresh_result = runner.invoke(app, [*base_args, "index", "refresh", "--target-dir", str(tmp_path)], prog_name="semctx")
+  clear_result = runner.invoke(app, [*base_args, "index", "clear"], prog_name="semctx")
+  clear_conflict_result = runner.invoke(app, [*base_args, "index", "clear", "--model", MODEL_SELECTOR, "--all"], prog_name="semctx")
+
+  assert init_result.exit_code == 1
+  assert "--model provider/model is required for `index init`" in init_result.stdout
+  assert status_result.exit_code == 1
+  assert "--model provider/model is required for `index status`" in status_result.stdout
+  assert refresh_result.exit_code == 1
+  assert "--model provider/model is required for `index refresh`" in refresh_result.stdout
+  assert clear_result.exit_code == 1
+  assert "`index clear` requires `--model provider/model` or explicit `--all`" in clear_result.stdout
+  assert clear_conflict_result.exit_code == 1
+  assert "Pass either `--model provider/model` or `--all`, not both." in clear_conflict_result.stdout
+
+
+def test_index_clear_all_clears_all_namespaced_indexes(tmp_path: Path, monkeypatch) -> None:
+  _write_project(tmp_path)
+  monkeypatch.setattr(
+    "semctx.tools.index_building.get_cached_embeddings",
+    _fake_get_cached_embeddings,
+  )
+  runner = CliRunner()
+  base_args = ["--cache-dir", str(tmp_path / ".semctx")]
+
+  for model_selector in (MODEL_SELECTOR, "ollama/second-model"):
+    result = runner.invoke(
+      app,
+      [*base_args, "index", "init", "--target-dir", str(tmp_path), "--model", model_selector],
+      prog_name="semctx",
+    )
+    assert result.exit_code == 0
+
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--all"], prog_name="semctx")
+  first_status = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", MODEL_SELECTOR], prog_name="semctx")
+  second_status = runner.invoke(app, [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", "ollama/second-model"], prog_name="semctx")
+
+  assert clear_result.exit_code == 0
+  assert "Index cleared." in clear_result.stdout
+  assert "Index not found. Run `semctx index init` first." in first_status.stdout or "Status: missing" in first_status.stdout
+  assert "Index not found. Run `semctx index init` first." in second_status.stdout or "Status: missing" in second_status.stdout
+
+
+def test_index_commands_reject_invalid_model_selectors_without_tracebacks(tmp_path: Path) -> None:
+  _write_project(tmp_path)
+  runner = CliRunner()
+  base_args = ["--cache-dir", str(tmp_path / ".semctx")]
+
+  init_result = runner.invoke(
+    app,
+    [*base_args, "index", "init", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  status_result = runner.invoke(
+    app,
+    [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--model", "invalid-selector"], prog_name="semctx")
+
+  for result in (init_result, status_result, clear_result):
+    assert result.exit_code == 1
+    assert result.stderr == ""
+    assert "Traceback" not in result.stdout
+    assert "Embedding provider is required when selecting an index database explicitly." in result.stdout
 
 
 def _write_project(root_dir: Path) -> None:

@@ -107,6 +107,27 @@ def resolve_requested_embedding_provider(
   return resolve_embedding_provider(resolved_provider_name)
 
 
+@beartype
+def resolve_explicit_embedding_provider(
+  provider_name: str | None,
+  model: str | None,
+) -> EmbeddingProviderConfig:
+  """Resolve provider/model input without defaulting missing pieces."""
+  raw_provider_name = provider_name.strip() if isinstance(provider_name, str) else ""
+  raw_model = model.strip() if isinstance(model, str) else ""
+  if raw_model:
+    resolved_from_model = coerce_embedding_provider(raw_model)
+    if resolved_from_model.provider_name != "raw":
+      if raw_provider_name and raw_provider_name != resolved_from_model.provider_name:
+        raise ValueError("Embedding provider does not match the provider/model selection.")
+      return resolved_from_model
+  if not raw_provider_name:
+    raise ValueError("Embedding provider is required when selecting an index database explicitly.")
+  if not raw_model:
+    raise ValueError("Embedding model is required when selecting an index database explicitly.")
+  return resolve_embedding_provider(raw_provider_name, raw_model)
+
+
 def _first_env_value(*names: str) -> str:
   """Return the first non-empty environment value for the given names."""
   for name in names:

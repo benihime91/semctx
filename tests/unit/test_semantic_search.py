@@ -2,6 +2,7 @@
 # FEATURE: Ranked indexed chunk-level code matches.
 from pathlib import Path
 
+from semctx.core.embedding_provider import resolve_explicit_embedding_provider
 from semctx.config.runtime_settings import build_runtime_settings
 from semctx.tools.index_lifecycle import init_index
 from semctx.tools.semantic_search import semantic_code_search
@@ -14,6 +15,9 @@ from tests.unit.semantic_search_fixtures import (
   write_intent_ranking_files,
 )
 
+MODEL_SELECTOR = "ollama/test-model"
+SEARCH_PROVIDER = resolve_explicit_embedding_provider(None, MODEL_SELECTOR)
+
 
 def test_semantic_code_search_returns_chunk_line_ranges_from_index(
   tmp_path: Path,
@@ -23,7 +27,7 @@ def test_semantic_code_search_returns_chunk_line_ranges_from_index(
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
   fetch_count = {"value": 0}
 
   def fake_query_fetch(texts: list[str], model: object) -> list[list[float]]:
@@ -36,6 +40,7 @@ def test_semantic_code_search_returns_chunk_line_ranges_from_index(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="hello greeting message",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_query_fetch,
   )
@@ -43,6 +48,7 @@ def test_semantic_code_search_returns_chunk_line_ranges_from_index(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="hello greeting message",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_query_fetch,
   )
@@ -70,12 +76,13 @@ def test_semantic_code_search_prefers_lifecycle_file_for_broad_query(
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
 
   results = semantic_code_search(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="sqlite index refresh",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_fetch_embeddings,
   )
@@ -95,12 +102,13 @@ def test_semantic_code_search_prefers_symbol_rich_match_for_symbol_lookup(
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
 
   results = semantic_code_search(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="build index metadata",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_fetch_embeddings,
   )
@@ -117,12 +125,13 @@ def test_semantic_code_search_prefers_workflow_file_for_workflow_lookup(
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
 
   results = semantic_code_search(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="how refresh works",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_fetch_embeddings,
   )
@@ -139,12 +148,13 @@ def test_semantic_code_search_limits_same_file_duplication_for_close_scores(
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
 
   results = semantic_code_search(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="sqlite index refresh",
+    provider=SEARCH_PROVIDER,
     top_k=5,
     embedding_fetcher=fake_fetch_embeddings,
   )
@@ -167,12 +177,13 @@ def test_semantic_code_search_prefers_primary_chunk_over_helper_chunk_when_score
     root_dir=tmp_path,
     cache_dir=tmp_path / ".semctx",
   )
-  init_index(runtime_settings, model="test-model", fetcher=fake_fetch_embeddings)
+  init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=fake_fetch_embeddings)
 
   results = semantic_code_search(
     root_dir=tmp_path,
     cache_dir=runtime_settings.cache_dir,
     query="sqlite index refresh",
+    provider=SEARCH_PROVIDER,
     top_k=3,
     embedding_fetcher=fake_fetch_embeddings,
   )

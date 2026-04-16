@@ -5,7 +5,7 @@ from pathlib import Path
 
 from beartype import beartype
 
-from semctx.core.embedding_provider import resolve_embedding_provider
+from semctx.core.embedding_provider import EmbeddingProviderConfig, resolve_embedding_provider
 from semctx.core.embeddings import (
   EmbeddingFetcher,
   fetch_embeddings,
@@ -15,6 +15,7 @@ from semctx.tools.search_intent import classify_search_intent
 from semctx.tools.search_ranking import resolve_search_ranking_options
 from semctx.tools.search_result_diversity import RankedCodeMatch, diversify_code_matches
 from semctx.tools.semantic_search_support import (
+  load_legacy_index_store,
   load_chunks,
   load_index_store,
   rank_chunk,
@@ -42,6 +43,7 @@ def semantic_code_search(
   root_dir: Path | None = None,
   cache_dir: Path,
   query: str,
+  provider: EmbeddingProviderConfig | None = None,
   top_k: int = 5,
   embedding_fetcher: EmbeddingFetcher | None = None,
 ) -> list[CodeSearchMatch]:
@@ -52,6 +54,7 @@ def semantic_code_search(
       root_dir: Deprecated compatibility alias for target_dir.
       cache_dir: Cache directory that holds the local index.
       query: Search text to rank against indexed chunks.
+      provider: Explicit provider/model selection for namespaced DB loading.
       top_k: Maximum number of matches to return.
       embedding_fetcher: Optional embedding fetcher override.
 
@@ -60,14 +63,19 @@ def semantic_code_search(
   """
   del target_dir, root_dir
   ranking_options = resolve_search_ranking_options(top_k=top_k)
-  store = load_index_store(cache_dir)
+  store = load_legacy_index_store(cache_dir) if provider is None else load_index_store(cache_dir, provider)
   metadata = store.load_metadata()
   if metadata is None:
     raise FileNotFoundError("Index not found. Run `semctx index init` first.")
-  provider = resolve_embedding_provider(metadata.provider, metadata.model)
+  if provider is None:
+    query_provider = resolve_embedding_provider(metadata.provider, metadata.model)
+  else:
+    if metadata.provider != provider.provider_name or metadata.model != provider.model:
+      raise ValueError("Selected provider/model does not match the targeted index metadata.")
+    query_provider = provider
   query_vector = get_cached_embeddings(
     cache_dir=cache_dir,
-    model=provider,
+    model=query_provider,
     texts=[query],
     fetcher=embedding_fetcher or fetch_embeddings,
   )[0]

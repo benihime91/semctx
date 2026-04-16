@@ -4,12 +4,14 @@ import click
 import typer
 from beartype import beartype
 
+from semctx.commands.model_selection_contract import ExplicitModelRequiredError, require_explicit_model
 from semctx.commands.output_format import JsonObject, render_error, render_output
 from semctx.commands.runtime_context import (
   build_command_runtime_settings,
   get_effective_target_dir_label,
 )
 from semctx.config.runtime_settings import RuntimeSettings
+from semctx.core.embedding_provider import resolve_explicit_embedding_provider
 from semctx.tools.index_lifecycle import ensure_search_ready_index
 from semctx.tools.semantic_identifiers import (
   IdentifierSearchMatch,
@@ -56,7 +58,7 @@ def register_search_identifiers_command(app: typer.Typer) -> None:
     model: str | None = typer.Option(
       None,
       "--model",
-      help="Embedding model override. Prefer provider/model for provider-aware search.",
+      help="Required embedding model selector as provider/model.",
     ),
     target_dir: str | None = typer.Option(None, "--target-dir", help="Directory whose contents are searched."),
     depth_limit: int = typer.Option(8, "--depth-limit", min=0, help="Directory depth limit."),
@@ -71,6 +73,13 @@ def register_search_identifiers_command(app: typer.Typer) -> None:
         "search-identifiers",
         str(error),
         "index_not_found",
+      )
+    except ExplicitModelRequiredError as error:
+      _exit_with_error(
+        runtime_settings.json_output,
+        "search-identifiers",
+        str(error),
+        "explicit_model_required",
       )
     except ValueError as error:
       _exit_with_error(
@@ -92,15 +101,18 @@ def _build_search_identifier_outputs(
   depth_limit: int,
 ) -> tuple[str, JsonObject]:
   """Build both text and JSON outputs for identifier search."""
+  resolved_model = require_explicit_model(model, "search-identifiers")
+  provider = resolve_explicit_embedding_provider(None, resolved_model)
   status = ensure_search_ready_index(
     runtime_settings=runtime_settings,
-    model=model,
+    model=resolved_model,
   )
   matches = semantic_identifier_search(
     target_dir=runtime_settings.target_dir,
     cache_dir=runtime_settings.cache_dir,
     query=query,
-    model=model,
+    model=resolved_model,
+    provider=provider,
     top_k=top_k,
     depth_limit=depth_limit,
   )
