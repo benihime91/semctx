@@ -148,6 +148,30 @@ def test_index_clear_all_clears_all_namespaced_indexes(tmp_path: Path, monkeypat
   assert "Index not found. Run `semctx index init` first." in second_status.stdout or "Status: missing" in second_status.stdout
 
 
+def test_index_commands_reject_invalid_model_selectors_without_tracebacks(tmp_path: Path) -> None:
+  _write_project(tmp_path)
+  runner = CliRunner()
+  base_args = ["--cache-dir", str(tmp_path / ".semctx")]
+
+  init_result = runner.invoke(
+    app,
+    [*base_args, "index", "init", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  status_result = runner.invoke(
+    app,
+    [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--model", "invalid-selector"], prog_name="semctx")
+
+  for result in (init_result, status_result, clear_result):
+    assert result.exit_code == 1
+    assert result.stderr == ""
+    assert "Traceback" not in result.stdout
+    assert "Embedding provider is required when selecting an index database explicitly." in result.stdout
+
+
 def _write_project(root_dir: Path) -> None:
   (root_dir / "app").mkdir(parents=True)
   (root_dir / "docs").mkdir(parents=True)

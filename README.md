@@ -51,13 +51,11 @@ Supported examples:
 - `gemini/gemini-embedding-2-preview`
 - `vertex_ai/gemini-embedding-2-preview`
 
-
 | Provider example                        | Required setup                                                                                                                                                      |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ollama/nomic-embed-text-v2-moe:latest` | Install Ollama, start the local Ollama service, and pull the embedding model before running `semctx`.                                                               |
 | `gemini/gemini-embedding-2-preview`     | Export `GEMINI_API_KEY` in the shell, CI job, or agent runtime that will execute `semctx`.                                                                          |
 | `vertex_ai/gemini-embedding-2-preview`  | Export `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, and `VERTEX_LOCATION`. Use a runtime with semctx's LiteLLM and Google auth dependencies available. |
-
 
 For `vertex_ai`, semctx normalizes an unset or `global` `VERTEX_LOCATION` to `us-central1` for LiteLLM's Vertex path.
 
@@ -98,8 +96,6 @@ Optional environment variables (only when your Ollama API is not on the default 
 export OLLAMA_API_BASE="http://127.0.0.1:11434"
 ```
 
-
-
 **Gemini embeddings** — `GEMINI_API_KEY`
 
 ### Gemini embeddings
@@ -110,9 +106,7 @@ If your default `--model` uses the `gemini/` prefix, set an API key in every she
 export GEMINI_API_KEY="your-api-key"
 ```
 
-
-
-**Vertex AI embeddings** — `GOOGLE_`* / `VERTEX_*` env vars
+**Vertex AI embeddings** — `GOOGLE_`\_ / `VERTEX\__` env vars
 
 ### Vertex AI embeddings
 
@@ -123,8 +117,6 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project"
 export VERTEX_LOCATION="us-central1"
 ```
-
-
 
 ### Using `SKILL.md` with AI agents
 
@@ -151,13 +143,19 @@ Your AI agents should use that configured default model for `index init`, `index
 
 #### Cursor
 
+<details>
+<summary>Cursor</summary>
 - **Project (committed):** `.cursor/skills/<skill-name>/SKILL.md` — for example `.cursor/skills/semctx/SKILL.md`.
 - **Personal:** `~/.cursor/skills/<skill-name>/SKILL.md` so the skill applies across workspaces.
 
 Copy or move `/tmp/semctx-SKILL.md` into that `SKILL.md` path (create the folders first). Cursor loads project skills from `.cursor/skills/`; see Cursor’s **create-skill** / Agent Skills docs for layout and frontmatter conventions.
 
+</details>
+
 #### OpenCode
 
+<details>
+<summary>OpenCode</summary>
 OpenCode discovers standard layout skills from several locations (see [Agent skills](https://opencode.ai/docs/skills/)):
 
 - **Project:** `.opencode/skills/<skill-name>/SKILL.md` (recommended), or compatible trees `.claude/skills/<skill-name>/SKILL.md`, `.agents/skills/<skill-name>/SKILL.md` under the repo.
@@ -165,23 +163,33 @@ OpenCode discovers standard layout skills from several locations (see [Agent ski
 
 Place the downloaded `SKILL.md` under a new folder such as `semctx`. OpenCode loads skills on demand via its `skill` tool; if a skill does not appear, confirm the directory name, frontmatter `name` / `description`, and `[opencode.json` skill permissions](https://opencode.ai/docs/skills/).
 
+</details>
+
 #### Codex (OpenAI)
 
+<details>
+<summary>Codex (OpenAI)</summary>
 Codex uses the Agent Skills layout for reusable workflows (see [Customization: skills](https://developers.openai.com/codex/concepts/customization/) and [Create a skill](https://developers.openai.com/codex/skills/create-skill)):
 
 - **Project (team):** `.agents/skills/<skill-name>/SKILL.md` in the repository.
 - **Personal:** `~/.agents/skills/<skill-name>/SKILL.md` for defaults on your machine.
 
-Copy the downloaded file into `SKILL.md` inside that folder. For durable repo-wide instructions (build commands, conventions, **when** to call semctx), also maintain a root `**AGENTS.md`**; Codex reads it automatically in addition to skills. In the CLI you can scaffold with `/init`, then merge in semctx-specific guidance.
+Copy the downloaded file into `SKILL.md` inside that folder. For durable repo-wide instructions (build commands, conventions, **when** to call semctx), also maintain a root `**AGENTS.md`\*\*; Codex reads it automatically in addition to skills. In the CLI you can scaffold with `/init`, then merge in semctx-specific guidance.
+
+</details>
 
 #### Claude Code
 
+<details>
+<summary>Claude Code</summary>
 Claude Code loads skills from project or user scope (see [Explore the `.claude` directory](https://code.claude.com/docs/en/claude-directory)):
 
 - **Project (committed):** `.claude/skills/<skill-name>/SKILL.md`.
 - **Personal:** `~/.claude/skills/<skill-name>/SKILL.md`.
 
-Optional: add or extend root `**CLAUDE.md`** for session-wide project context (build, architecture) alongside the skill. After installing, run `/skills` in a session to confirm the skill is listed.
+Optional: add or extend root `**CLAUDE.md`\*\* for session-wide project context (build, architecture) alongside the skill. After installing, run `/skills` in a session to confirm the skill is listed.
+
+</details>
 
 ## Quick Start
 
@@ -221,7 +229,6 @@ If you want to search only `backend/`, point `--target-dir` at `backend/`. Files
 
 `semctx` uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) grammars to parse files and extract symbols for discovery, chunking, indexing, and blast-radius analysis.
 
-
 | Language   | Extensions    | Extracted symbols                                                               |
 | ---------- | ------------- | ------------------------------------------------------------------------------- |
 | Python     | `.py`         | functions, classes                                                              |
@@ -230,7 +237,6 @@ If you want to search only `backend/`, point `--target-dir` at `backend/`. Files
 | Go         | `.go`         | functions, methods, struct and interface types                                  |
 | Rust       | `.rs`         | functions, structs, enums, traits, impl blocks, types, consts, modules, statics |
 | Kotlin     | `.kt`, `.kts` | functions, classes, interfaces, objects, properties                             |
-
 
 Files with other extensions are still indexed as plain text for semantic search when included in scope, but symbol-level features (tree, skeleton, blast-radius, symbol-aligned chunks) apply only to the languages above.
 
@@ -243,7 +249,6 @@ Files with other extensions are still indexed as plain text for semantic search 
 - **Semantic Search:** `search-code`, `search-identifiers`
 - **Analysis:** `blast-radius`
 
-
 | Command              | Description                                                     |
 | -------------------- | --------------------------------------------------------------- |
 | `tree`               | View the structural tree of a directory including symbols       |
@@ -252,7 +257,6 @@ Files with other extensions are still indexed as plain text for semantic search 
 | `search-code`        | Search the codebase by semantic meaning                         |
 | `search-identifiers` | Search functions and classes by semantic intent                 |
 | `blast-radius`       | Trace symbol usage across the codebase                          |
-
 
 ### Discovery (Tree & Skeleton)
 

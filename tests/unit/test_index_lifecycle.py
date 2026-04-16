@@ -15,7 +15,7 @@ from semctx.tools.index_lifecycle import (
   refresh_index,
   status_index,
 )
-from semctx.tools.index_status import render_index_status
+from semctx.tools.index_status import IndexStatus, render_index_status
 
 MODEL_SELECTOR = "ollama/test-model"
 
@@ -195,6 +195,59 @@ def test_index_lifecycle_requires_explicit_model_selection(tmp_path: Path) -> No
     refresh_index(runtime_settings, fetcher=_fake_fetch_embeddings)
   with pytest.raises(ValueError, match="Embedding provider is required"):
     clear_index(runtime_settings)
+
+
+def test_init_index_creates_namespaced_parent_before_rebuild(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _write_project(tmp_path)
+  runtime_settings = build_runtime_settings(
+    root_dir=tmp_path,
+    cache_dir=tmp_path / ".semctx",
+  )
+  db_path = get_requested_index_db_path(runtime_settings.cache_dir, None, MODEL_SELECTOR)
+  observed_parent_exists: list[bool] = []
+
+  def fake_rebuild_ready_index(*args: object) -> IndexStatus:
+    rebuild_db_path = args[-1]
+    assert isinstance(rebuild_db_path, Path)
+    observed_parent_exists.append(rebuild_db_path.parent.exists())
+    return IndexStatus(False, False, False, "ollama", "test-model", 0, 0, 0, (), (), rebuild_db_path)
+
+  monkeypatch.setattr("semctx.tools.index_lifecycle.rebuild_ready_index", fake_rebuild_ready_index)
+
+  status = init_index(runtime_settings, model=MODEL_SELECTOR, fetcher=_fake_fetch_embeddings)
+
+  assert db_path.parent.exists() is True
+  assert observed_parent_exists == [True]
+  assert status.db_path == db_path
+
+
+def test_refresh_index_creates_namespaced_parent_before_full_rebuild(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  _write_project(tmp_path)
+  runtime_settings = build_runtime_settings(
+    root_dir=tmp_path,
+    cache_dir=tmp_path / ".semctx",
+  )
+  db_path = get_requested_index_db_path(runtime_settings.cache_dir, None, MODEL_SELECTOR)
+  observed_parent_exists: list[bool] = []
+
+  monkeypatch.setattr(
+    "semctx.tools.index_lifecycle.status_index",
+    lambda *args, **kwargs: IndexStatus(False, False, False, None, None, 0, 0, 0, (), (), db_path),
+  )
+
+  def fake_rebuild_ready_index(*args: object) -> IndexStatus:
+    rebuild_db_path = args[-1]
+    assert isinstance(rebuild_db_path, Path)
+    observed_parent_exists.append(rebuild_db_path.parent.exists())
+    return IndexStatus(False, False, False, "ollama", "test-model", 0, 0, 0, (), (), rebuild_db_path)
+
+  monkeypatch.setattr("semctx.tools.index_lifecycle.rebuild_ready_index", fake_rebuild_ready_index)
+
+  status = refresh_index(runtime_settings, model=MODEL_SELECTOR, full=True, fetcher=_fake_fetch_embeddings)
+
+  assert db_path.parent.exists() is True
+  assert observed_parent_exists == [True]
+  assert status.db_path == db_path
 
 
 def _write_project(root_dir: Path) -> None:

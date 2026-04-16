@@ -57,6 +57,8 @@ def init_command(
     )
   except ExplicitModelRequiredError as error:
     _exit_with_error(runtime_settings.json_output, "index", str(error), "explicit_model_required")
+  except ValueError as error:
+    _exit_with_error(runtime_settings.json_output, "index", str(error), "invalid_arguments")
   typer.echo(
     render_output(
       f"Index initialized.\n{render_index_status(status)}",
@@ -84,6 +86,8 @@ def status_command(
     status = status_index(runtime_settings, model=require_explicit_model(model, "index status"), depth_limit=depth_limit)
   except ExplicitModelRequiredError as error:
     _exit_with_error(runtime_settings.json_output, "index", str(error), "explicit_model_required")
+  except ValueError as error:
+    _exit_with_error(runtime_settings.json_output, "index", str(error), "invalid_arguments")
   typer.echo(
     render_output(
       render_index_status(status),
@@ -145,14 +149,18 @@ def clear_command(
   """Remove the local search index database when present."""
   runtime_settings = build_command_runtime_settings(ctx)
   cleared_paths = get_all_index_db_paths(runtime_settings.cache_dir) if clear_all else ()
+  db_path = None
   try:
     selected_model = validate_clear_selection(model, clear_all)
     cleared = clear_index(runtime_settings, model=selected_model, clear_all=clear_all)
+    if not clear_all:
+      db_path = get_index_db_path(runtime_settings.cache_dir, resolve_explicit_embedding_provider(None, selected_model))
   except ExplicitModelRequiredError as error:
     _exit_with_error(runtime_settings.json_output, "index", str(error), "explicit_model_required")
   except InvalidCommandSelectionError as error:
     _exit_with_error(runtime_settings.json_output, "index", str(error), "invalid_arguments")
-  db_path = None if clear_all else get_index_db_path(runtime_settings.cache_dir, resolve_explicit_embedding_provider(None, selected_model))
+  except ValueError as error:
+    _exit_with_error(runtime_settings.json_output, "index", str(error), "invalid_arguments")
   text_output = "Index cleared." if cleared else "No index found."
   payload: JsonObject = {
     "cleared": cleared,

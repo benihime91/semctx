@@ -391,6 +391,31 @@ def test_index_status_emits_rebuild_required_json(tmp_path: Path, monkeypatch) -
   assert payload["status"]["changed_paths"] == ["app/main.py"]
 
 
+def test_index_commands_emit_invalid_argument_json_for_invalid_model_selector(tmp_path: Path) -> None:
+  _write_index_fixture(tmp_path)
+  runner = CliRunner()
+  base_args = ["--json", "--cache-dir", str(tmp_path / ".semctx")]
+
+  init_result = runner.invoke(
+    app,
+    [*base_args, "index", "init", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  status_result = runner.invoke(
+    app,
+    [*base_args, "index", "status", "--target-dir", str(tmp_path), "--model", "invalid-selector"],
+    prog_name="semctx",
+  )
+  clear_result = runner.invoke(app, [*base_args, "index", "clear", "--model", "invalid-selector"], prog_name="semctx")
+
+  for result in (init_result, status_result, clear_result):
+    payload = json.loads(result.stdout)
+    assert result.exit_code == 1
+    assert payload["command"] == "index"
+    assert payload["error"] == "invalid_arguments"
+    assert payload["message"] == "Embedding provider is required when selecting an index database explicitly."
+
+
 def _write_index_fixture(root_dir: Path) -> None:
   (root_dir / "app").mkdir(parents=True)
   (root_dir / "app" / "main.py").write_text(

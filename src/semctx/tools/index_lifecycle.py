@@ -47,6 +47,12 @@ def _resolve_lifecycle_selection(
 
 
 @beartype
+def _ensure_index_db_parent_dir(db_path: Path) -> None:
+  """Create the namespaced DB parent directory when missing."""
+  db_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+@beartype
 def init_index(
   runtime_settings: RuntimeSettings,
   provider_name: str | None = None,
@@ -56,6 +62,7 @@ def init_index(
 ) -> IndexStatus:
   """Build a fresh local search index."""
   provider, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
+  _ensure_index_db_parent_dir(db_path)
   current_files = collect_current_files(runtime_settings.target_dir, depth_limit)
   return rebuild_ready_index(
     runtime_settings,
@@ -95,6 +102,7 @@ def refresh_index(
 ) -> IndexStatus:
   """Refresh the local index or require a full rebuild when needed."""
   provider, db_path = _resolve_lifecycle_selection(runtime_settings, provider_name, model)
+  _ensure_index_db_parent_dir(db_path)
   current_status = status_index(runtime_settings, provider_name, model, depth_limit)
   current_files = collect_current_files(runtime_settings.target_dir, depth_limit)
   metadata = build_metadata(runtime_settings.target_dir, provider)
