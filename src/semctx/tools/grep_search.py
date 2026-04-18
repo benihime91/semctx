@@ -3,10 +3,16 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from beartype import beartype
 
 from semctx.core.walker import CODE_SUFFIXES, INDEX_TEXT_SUFFIXES, FileEntry, walk_target_directory
+
+if TYPE_CHECKING:
+  from semctx.core.regex_index_store import RegexIndexedFileRecord
+
+CandidateState = tuple[frozenset[str], dict[str, "RegexIndexedFileRecord"]]
 
 DEFAULT_GREP_DEPTH_LIMIT = 8
 
@@ -54,11 +60,9 @@ def grep_search(
   """Search supported files under one target directory for matching lines."""
   compiled_pattern = _compile_pattern(pattern, ignore_case, fixed_strings)
   candidate_paths = _resolve_candidate_paths(
-    target_dir=target_dir,
     cache_dir=cache_dir,
     pattern=pattern,
     fixed_strings=fixed_strings,
-    depth_limit=depth_limit,
   )
   matches: list[GrepMatch] = []
   match_count = 0
@@ -67,7 +71,7 @@ def grep_search(
     depth_limit=depth_limit,
     include_index_text_files=True,
   ):
-    if candidate_paths is not None and entry.relative_path.as_posix() not in candidate_paths:
+    if candidate_paths is not None and not _should_scan_entry(entry, candidate_paths):
       continue
     if not _matches_path_filters(entry.relative_path, include, exclude):
       continue
@@ -89,18 +93,15 @@ def grep_search(
 
 
 def _resolve_candidate_paths(
-  target_dir: Path,
   cache_dir: Path | None,
   pattern: str,
   fixed_strings: bool,
-  depth_limit: int,
-) -> frozenset[str] | None:
-  """Return indexed candidate paths plus unproven-fresh paths, or None for full scan."""
+) -> CandidateState | None:
+  """Return indexed candidates plus tracked freshness metadata, or None for full scan."""
   if cache_dir is None:
     return None
   try:
     from semctx.core.regex_index_store import RegexIndexStore
-    from semctx.tools.regex_index_builder import collect_regex_index_entries
     from semctx.tools.regex_index_candidates import extract_required_trigrams
     from semctx.tools.regex_index_db_paths import get_regex_index_db_path
 
@@ -112,17 +113,26 @@ def _resolve_candidate_paths(
       return None
     store = RegexIndexStore(db_path)
     indexed_records = {record.relative_path: record for record in store.load_indexed_files()}
-    unproven_paths: set[str] = set()
-    for entry in collect_regex_index_entries(target_dir, depth_limit):
-      posix_path = entry.relative_path.as_posix()
-      stat_result = entry.absolute_path.stat()
-      indexed = indexed_records.get(posix_path)
-      if indexed is None or indexed.mtime_ns != int(stat_result.st_mtime_ns) or indexed.size_bytes != int(stat_result.st_size):
-        unproven_paths.add(posix_path)
     indexed_candidates = store.candidate_paths_for_trigrams(required_trigrams)
   except Exception:
     return None
-  return frozenset(indexed_candidates | unproven_paths)
+  return indexed_candidates, indexed_records
+
+
+def _should_scan_entry(
+  entry: FileEntry,
+  candidate_state: CandidateState,
+) -> bool:
+  """Return whether one walked entry should still be scanned."""
+  indexed_candidates, indexed_records = candidate_state
+  posix_path = entry.relative_path.as_posix()
+  if posix_path in indexed_candidates:
+    return True
+  indexed = indexed_records.get(posix_path)
+  if indexed is None:
+    return True
+  stat_result = entry.absolute_path.stat()
+  return indexed.mtime_ns != int(stat_result.st_mtime_ns) or indexed.size_bytes != int(stat_result.st_size)
 
 
 def _compile_pattern(pattern: str, ignore_case: bool, fixed_strings: bool) -> re.Pattern[str]:

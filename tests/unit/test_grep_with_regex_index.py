@@ -15,8 +15,9 @@ from semctx.tools.regex_index_lifecycle import init_regex_index
 def test_grep_without_cache_dir_falls_back_to_full_scan(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
   _write_workspace(tmp_path)
 
-  scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle")
+  walk_calls, scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle")
 
+  assert walk_calls == 1
   assert scanned_paths == _all_searchable_paths()
   assert [match.relative_path.as_posix() for match in result.matches] == ["app/main.py", "notes.txt"]
 
@@ -24,18 +25,20 @@ def test_grep_without_cache_dir_falls_back_to_full_scan(tmp_path: Path, monkeypa
 def test_grep_with_cache_dir_but_no_db_falls_back_to_full_scan(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
   _write_workspace(tmp_path)
 
-  scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle", cache_dir=tmp_path / ".semctx")
+  walk_calls, scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle", cache_dir=tmp_path / ".semctx")
 
+  assert walk_calls == 1
   assert scanned_paths == _all_searchable_paths()
   assert [match.relative_path.as_posix() for match in result.matches] == ["app/main.py", "notes.txt"]
 
 
-def test_grep_with_built_regex_index_narrows_candidates(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_grep_with_built_regex_index_uses_one_tree_walk_and_narrows_candidates(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
   _write_workspace(tmp_path)
   init_regex_index(_build_runtime_settings(tmp_path), depth_limit=4)
 
-  scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle", cache_dir=tmp_path / ".semctx")
+  walk_calls, scanned_paths, result = _run_recorded_search(tmp_path, monkeypatch, pattern="needle", cache_dir=tmp_path / ".semctx")
 
+  assert walk_calls == 1
   assert scanned_paths == ["app/main.py", "notes.txt"]
   assert [match.relative_path.as_posix() for match in result.matches] == ["app/main.py", "notes.txt"]
 
@@ -67,7 +70,7 @@ def test_grep_with_short_literal_falls_back_to_full_scan(tmp_path: Path, monkeyp
   _write_workspace(tmp_path)
   init_regex_index(_build_runtime_settings(tmp_path), depth_limit=4)
 
-  scanned_paths, result = _run_recorded_search(
+  walk_calls, scanned_paths, result = _run_recorded_search(
     tmp_path,
     monkeypatch,
     pattern="hi",
@@ -75,6 +78,7 @@ def test_grep_with_short_literal_falls_back_to_full_scan(tmp_path: Path, monkeyp
     cache_dir=tmp_path / ".semctx",
   )
 
+  assert walk_calls == 1
   assert scanned_paths == _all_searchable_paths()
   assert result.match_count == 1
   assert [match.relative_path.as_posix() for match in result.matches] == ["docs/guide.md"]
@@ -86,13 +90,14 @@ def test_grep_with_alternation_falls_back_to_full_scan(tmp_path: Path, monkeypat
   (tmp_path / "notes.txt").write_text("xyz_longer here\n", encoding="utf-8")
   init_regex_index(_build_runtime_settings(tmp_path), depth_limit=4)
 
-  scanned_paths, result = _run_recorded_search(
+  walk_calls, scanned_paths, result = _run_recorded_search(
     tmp_path,
     monkeypatch,
     pattern="abc|xyz_longer",
     cache_dir=tmp_path / ".semctx",
   )
 
+  assert walk_calls == 1
   assert scanned_paths == _all_searchable_paths()
   assert [match.relative_path.as_posix() for match in result.matches] == ["app/main.py", "notes.txt"]
 
@@ -104,9 +109,11 @@ def _run_recorded_search(
   pattern: str,
   fixed_strings: bool = False,
   cache_dir: Path | None = None,
-) -> tuple[list[str], GrepSearchResult]:
+) -> tuple[int, list[str], GrepSearchResult]:
   original = grep_search_module._collect_entry_matches
+  original_walk = grep_search_module.walk_target_directory
   scanned_paths: list[str] = []
+  walk_calls = 0
 
   def _recording_wrapper(
     entry: FileEntry,
@@ -117,9 +124,15 @@ def _run_recorded_search(
     scanned_paths.append(entry.relative_path.as_posix())
     return original(entry, pattern, before_context, after_context)
 
+  def _recording_walk(*args, **kwargs):
+    nonlocal walk_calls
+    walk_calls += 1
+    yield from original_walk(*args, **kwargs)
+
   monkeypatch.setattr(grep_search_module, "_collect_entry_matches", _recording_wrapper)
+  monkeypatch.setattr(grep_search_module, "walk_target_directory", _recording_walk)
   result = grep_search(target_dir=root_dir, pattern=pattern, fixed_strings=fixed_strings, cache_dir=cache_dir)
-  return scanned_paths, result
+  return walk_calls, scanned_paths, result
 
 
 def _build_runtime_settings(root_dir: Path):

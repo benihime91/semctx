@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from semctx.core.regex_index_schema import REGEX_REQUIRED_TABLE_NAMES, REGEX_SCHEMA_VERSION
-from semctx.core.regex_index_store import RegexFileTrigramSet, RegexIndexedFileRecord, RegexIndexStore
+from semctx.core.regex_index_store import SQLITE_DELETE_BATCH_SIZE, RegexFileTrigramSet, RegexIndexedFileRecord, RegexIndexStore
 
 
 def test_regex_index_store_creates_schema_on_fresh_database(tmp_path: Path) -> None:
@@ -63,7 +63,19 @@ def test_candidate_paths_for_trigrams_returns_intersection_and_empty_input(tmp_p
   )
 
   assert store.candidate_paths_for_trigrams(("abc", "bcd")) == frozenset({"a.py", "b.py"})
+  assert store.candidate_paths_for_trigrams(("abc", "missing")) == frozenset()
   assert store.candidate_paths_for_trigrams(()) == frozenset()
+
+
+def test_delete_files_chunks_large_batches_without_losing_rows(tmp_path: Path) -> None:
+  store = RegexIndexStore(tmp_path / "index.db")
+  items = tuple(_item(f"file_{index}.py", index, index + 100, {f"t{index:03d}"}) for index in range(SQLITE_DELETE_BATCH_SIZE + 5))
+  store.replace_files_and_trigrams(items)
+
+  store.delete_files(tuple(item.record.relative_path for item in items))
+
+  assert store.load_indexed_files() == ()
+  assert store.candidate_paths_for_trigrams(("t000",)) == frozenset()
 
 
 def _item(relative_path: str, mtime_ns: int, size_bytes: int, trigrams: set[str]) -> RegexFileTrigramSet:

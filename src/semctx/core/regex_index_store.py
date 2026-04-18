@@ -8,6 +8,8 @@ from beartype import beartype
 
 from semctx.core.regex_index_schema import ensure_regex_index_schema
 
+SQLITE_DELETE_BATCH_SIZE = 900
+
 
 @dataclass(frozen=True)
 class RegexIndexedFileRecord:
@@ -86,12 +88,13 @@ class RegexIndexStore:
     """Delete tracked files and their trigrams by relative path."""
     if not relative_paths:
       return
-    placeholders = ", ".join("?" for _ in relative_paths)
     with self._connect() as connection:
-      connection.execute(
-        f"DELETE FROM regex_indexed_files WHERE relative_path IN ({placeholders})",
-        relative_paths,
-      )
+      for batch in _chunk_relative_paths(relative_paths):
+        placeholders = ", ".join("?" for _ in batch)
+        connection.execute(
+          f"DELETE FROM regex_indexed_files WHERE relative_path IN ({placeholders})",
+          batch,
+        )
       connection.commit()
 
   @beartype
@@ -99,21 +102,22 @@ class RegexIndexStore:
     """Return the intersection of candidate paths for every required trigram."""
     if not trigrams:
       return frozenset()
+    unique_trigrams = tuple(dict.fromkeys(trigrams))
+    placeholders = ", ".join("?" for _ in unique_trigrams)
     with self._connect() as connection:
-      result: set[str] | None = None
-      for trigram in trigrams:
-        rows = connection.execute(
-          "SELECT relative_path FROM regex_trigrams WHERE trigram = ?",
-          (trigram,),
-        ).fetchall()
-        current = {str(row[0]) for row in rows}
-        result = current if result is None else result & current
-        if not result:
-          return frozenset()
-    return frozenset(result or set())
+      rows = connection.execute(
+        (f"SELECT relative_path FROM regex_trigrams WHERE trigram IN ({placeholders}) GROUP BY relative_path HAVING COUNT(DISTINCT trigram) = ?"),
+        (*unique_trigrams, len(unique_trigrams)),
+      ).fetchall()
+    return frozenset(str(row[0]) for row in rows)
 
   def _connect(self) -> sqlite3.Connection:
     """Create a SQLite connection with foreign keys enabled."""
     connection = sqlite3.connect(self.db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+
+def _chunk_relative_paths(relative_paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+  """Split large delete batches into SQLite-safe placeholder groups."""
+  return tuple(relative_paths[index : index + SQLITE_DELETE_BATCH_SIZE] for index in range(0, len(relative_paths), SQLITE_DELETE_BATCH_SIZE))
