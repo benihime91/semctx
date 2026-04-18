@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from beartype import beartype
 
 from semctx.core.walker import CODE_SUFFIXES, INDEX_TEXT_SUFFIXES, FileEntry, walk_target_directory
+from semctx.tools.grep_match_stream import collect_streamed_line_matches
 
 if TYPE_CHECKING:
   from semctx.core.regex_index_store import RegexIndexedFileRecord
@@ -153,18 +154,14 @@ def _collect_entry_matches(
 ) -> list[GrepMatch]:
   """Collect matching lines from one discovered file."""
   entry_matches: list[GrepMatch] = []
-  lines = entry.absolute_path.read_text(encoding="utf-8", errors="replace").splitlines()
-  for line_number, line_text in enumerate(lines, start=1):
-    if not pattern.search(line_text):
-      continue
-    line_index = line_number - 1
+  for match in collect_streamed_line_matches(entry.absolute_path, pattern, before_context, after_context):
     entry_matches.append(
       GrepMatch(
         relative_path=entry.relative_path,
-        line_number=line_number,
-        line_text=line_text,
-        context_before=tuple(lines[max(line_index - before_context, 0) : line_index]),
-        context_after=tuple(lines[line_index + 1 : line_index + 1 + after_context]),
+        line_number=match.line_number,
+        line_text=match.line_text,
+        context_before=match.context_before,
+        context_after=match.context_after,
       )
     )
   return entry_matches

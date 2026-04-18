@@ -78,8 +78,46 @@ def test_delete_files_chunks_large_batches_without_losing_rows(tmp_path: Path) -
   assert store.candidate_paths_for_trigrams(("t000",)) == frozenset()
 
 
+def test_regex_index_store_closes_connections_after_each_method_call(tmp_path: Path, monkeypatch) -> None:
+  store = RegexIndexStore(tmp_path / "index.db")
+  created_connections: list[FakeConnection] = []
+
+  def _fake_connect() -> FakeConnection:
+    connection = FakeConnection()
+    created_connections.append(connection)
+    return connection
+
+  monkeypatch.setattr(store, "_connect", _fake_connect)
+
+  assert store.load_metadata() == {}
+  store.set_metadata({"target_dir": "/tmp/workspace"})
+
+  assert len(created_connections) == 2
+  assert all(connection.closed for connection in created_connections)
+
+
 def _item(relative_path: str, mtime_ns: int, size_bytes: int, trigrams: set[str]) -> RegexFileTrigramSet:
   return RegexFileTrigramSet(
     record=RegexIndexedFileRecord(relative_path=relative_path, mtime_ns=mtime_ns, size_bytes=size_bytes),
     trigrams=frozenset(trigrams),
   )
+
+
+class FakeConnection:
+  def __init__(self) -> None:
+    self.closed = False
+
+  def execute(self, *_args, **_kwargs) -> "FakeConnection":
+    return self
+
+  def executemany(self, *_args, **_kwargs) -> "FakeConnection":
+    return self
+
+  def fetchall(self) -> list[tuple[object, object]]:
+    return []
+
+  def commit(self) -> None:
+    return None
+
+  def close(self) -> None:
+    self.closed = True

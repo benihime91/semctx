@@ -102,6 +102,24 @@ def test_grep_with_alternation_falls_back_to_full_scan(tmp_path: Path, monkeypat
   assert [match.relative_path.as_posix() for match in result.matches] == ["app/main.py", "notes.txt"]
 
 
+def test_grep_streaming_match_collection_preserves_context_without_trailing_newline(tmp_path: Path) -> None:
+  _write_workspace(tmp_path, main_text="before line\nneedle target\nafter line")
+  (tmp_path / "notes.txt").write_text("plain text\n", encoding="utf-8")
+
+  result = grep_search(target_dir=tmp_path, pattern="needle target", before_context=1, after_context=1)
+
+  assert result.match_count == 1
+  assert result.matches == [
+    GrepMatch(
+      relative_path=Path("app/main.py"),
+      line_number=2,
+      line_text="needle target",
+      context_before=("before line",),
+      context_after=("after line",),
+    )
+  ]
+
+
 def _run_recorded_search(
   root_dir: Path,
   monkeypatch: MonkeyPatch,

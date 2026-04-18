@@ -1,9 +1,11 @@
 """Regex candidate-prefilter index store."""
 
+from contextlib import contextmanager
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from beartype.typing import Iterator
 from beartype import beartype
 
 from semctx.core.regex_index_schema import ensure_regex_index_schema
@@ -40,7 +42,7 @@ class RegexIndexStore:
   @beartype
   def set_metadata(self, items: dict[str, str]) -> None:
     """Upsert regex-index metadata rows."""
-    with self._connect() as connection:
+    with self._connection() as connection:
       connection.executemany(
         "INSERT OR REPLACE INTO regex_index_metadata(key, value) VALUES (?, ?)",
         tuple((key, value) for key, value in items.items()),
@@ -50,14 +52,14 @@ class RegexIndexStore:
   @beartype
   def load_metadata(self) -> dict[str, str]:
     """Load all regex-index metadata rows."""
-    with self._connect() as connection:
+    with self._connection() as connection:
       rows = connection.execute("SELECT key, value FROM regex_index_metadata").fetchall()
     return {str(key): str(value) for key, value in rows}
 
   @beartype
   def load_indexed_files(self) -> tuple[RegexIndexedFileRecord, ...]:
     """Load the tracked indexed-file manifest."""
-    with self._connect() as connection:
+    with self._connection() as connection:
       rows = connection.execute("SELECT relative_path, mtime_ns, size_bytes FROM regex_indexed_files ORDER BY relative_path").fetchall()
     return tuple(RegexIndexedFileRecord(relative_path=str(row[0]), mtime_ns=int(row[1]), size_bytes=int(row[2])) for row in rows)
 
@@ -66,7 +68,7 @@ class RegexIndexStore:
     """Replace the indexed rows for the provided files and refresh their trigrams."""
     if not items:
       return
-    with self._connect() as connection:
+    with self._connection() as connection:
       connection.executemany(
         "INSERT OR REPLACE INTO regex_indexed_files(relative_path, mtime_ns, size_bytes) VALUES (?, ?, ?)",
         tuple((item.record.relative_path, item.record.mtime_ns, item.record.size_bytes) for item in items),
@@ -75,12 +77,10 @@ class RegexIndexStore:
         "DELETE FROM regex_trigrams WHERE relative_path = ?",
         tuple((item.record.relative_path,) for item in items),
       )
-      trigram_rows = tuple((trigram, item.record.relative_path) for item in items for trigram in item.trigrams)
-      if trigram_rows:
-        connection.executemany(
-          "INSERT OR IGNORE INTO regex_trigrams(trigram, relative_path) VALUES (?, ?)",
-          trigram_rows,
-        )
+      connection.executemany(
+        "INSERT OR IGNORE INTO regex_trigrams(trigram, relative_path) VALUES (?, ?)",
+        _iter_trigram_rows(items),
+      )
       connection.commit()
 
   @beartype
@@ -88,7 +88,7 @@ class RegexIndexStore:
     """Delete tracked files and their trigrams by relative path."""
     if not relative_paths:
       return
-    with self._connect() as connection:
+    with self._connection() as connection:
       for batch in _chunk_relative_paths(relative_paths):
         placeholders = ", ".join("?" for _ in batch)
         connection.execute(
@@ -104,12 +104,21 @@ class RegexIndexStore:
       return frozenset()
     unique_trigrams = tuple(dict.fromkeys(trigrams))
     placeholders = ", ".join("?" for _ in unique_trigrams)
-    with self._connect() as connection:
+    with self._connection() as connection:
       rows = connection.execute(
         (f"SELECT relative_path FROM regex_trigrams WHERE trigram IN ({placeholders}) GROUP BY relative_path HAVING COUNT(DISTINCT trigram) = ?"),
         (*unique_trigrams, len(unique_trigrams)),
       ).fetchall()
     return frozenset(str(row[0]) for row in rows)
+
+  @contextmanager
+  def _connection(self) -> Iterator[sqlite3.Connection]:
+    """Yield one SQLite connection and always close it afterwards."""
+    connection = self._connect()
+    try:
+      yield connection
+    finally:
+      connection.close()
 
   def _connect(self) -> sqlite3.Connection:
     """Create a SQLite connection with foreign keys enabled."""
@@ -121,3 +130,10 @@ class RegexIndexStore:
 def _chunk_relative_paths(relative_paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
   """Split large delete batches into SQLite-safe placeholder groups."""
   return tuple(relative_paths[index : index + SQLITE_DELETE_BATCH_SIZE] for index in range(0, len(relative_paths), SQLITE_DELETE_BATCH_SIZE))
+
+
+def _iter_trigram_rows(items: tuple[RegexFileTrigramSet, ...]) -> Iterator[tuple[str, str]]:
+  """Yield trigram insert rows without materializing the full cross-product."""
+  for item in items:
+    for trigram in item.trigrams:
+      yield trigram, item.record.relative_path
