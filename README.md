@@ -14,17 +14,17 @@ A semantic codebase discovery and search CLI. It provides repository discovery, 
   - [Using SKILL.md with AI agents](#using-skillmd-with-ai-agents)
     - [Cursor](#cursor)
     - [OpenCode](#opencode)
-    - [Codex](#codex-openai)
+    - [Codex (OpenAI)](#codex-openai)
     - [Claude Code](#claude-code)
 - [Quick Start](#quick-start)
   - [First commands](#first-commands)
   - [Scope model](#scope-model)
 - [Supported Languages](#supported-languages)
 - [Supported Commands](#supported-commands)
-  - [Discovery (Tree & Skeleton)](#discovery-tree-skeleton)
+  - [Discovery (Tree & Skeleton)](#discovery-tree--skeleton)
   - [Semantic Search](#semantic-search)
-  - [Index lifecycle](#index-lifecycle)
-  - [Blast radius](#blast-radius)
+  - [Index Lifecycle](#index-lifecycle)
+  - [Blast Radius](#blast-radius)
 - [Development checks](#development-checks)
 
 ## Installation
@@ -71,55 +71,39 @@ semctx --target-dir "backend/" --cache-dir ".semctx-vertex" index init --model "
 semctx --target-dir "backend/" --cache-dir ".semctx-vertex" search-code "retry policy" --model "vertex_ai/gemini-embedding-2-preview"
 ```
 
-Install commands and environment variables for each backend are in the sections below — **three separate collapsibles**, each **collapsed by default** on GitHub (expand the one you need).
-
-**Ollama embeddings** — install, `ollama pull`, optional `OLLAMA_API_BASE`
-
-### Ollama embeddings
+Install commands and environment variables for each backend are in the sections below —
 
 <details>
 <summary>Ollama embeddings</summary>
-If your default `--model` uses the `ollama/` prefix (for example `ollama/nomic-embed-text-v2-moe:latest`), install and run [Ollama](https://ollama.com/) on the same machine (or network-reachable host) that will execute `semctx`, then pull the **exact** embedding model name you pass to `--model`:
+If your default `--model` uses the `ollama/` prefix (for example `ollama/nomic-embed-text-v2-moe:latest`), install and run [Ollama](https://ollama.com/) on the same machine (or network-reachable host) that will execute `semctx`, then pull the **exact** embedding model name you pass to `--model`
 
 ```bash
 # Install Ollama (see https://ollama.com/download for installers and package managers)
 curl -fsSL https://ollama.com/install.sh | sh
-
 # Pull the embedding weights semctx will request via LiteLLM
 ollama pull nomic-embed-text-v2-moe:latest
 ```
 
 Keep the Ollama daemon running while indexing or searching (`ollama serve` runs in the background on most installs). No API key is required for a local server on the default address.
-
 Optional environment variables (only when your Ollama API is not on the default host or port):
 
 ```bash
 # LiteLLM / semctx: override the Ollama OpenAI-compatible base URL if needed
 export OLLAMA_API_BASE="http://127.0.0.1:11434"
 ```
-
 </details>
-
-**Gemini embeddings** — `GEMINI_API_KEY`
 
 <details>
 <summary>Gemini embeddings</summary>
-### Gemini embeddings
-
 If your default `--model` uses the `gemini/` prefix, set an API key in every shell, CI job, or agent runtime that runs `semctx`:
 
 ```bash
 export GEMINI_API_KEY="your-api-key"
 ```
-
 </details>
-
-**Vertex AI embeddings** — `GOOGLE_`\_ / `VERTEX\__` env vars
 
 <details>
 <summary>Vertex AI embeddings</summary>
-### Vertex AI embeddings
-
 If your default `--model` uses the `vertex_ai/` prefix, point LiteLLM at Google Cloud with application-default credentials (or a service account) plus project and region. `semctx` maps these into the env names LiteLLM expects; unset or `global` `VERTEX_LOCATION` is normalized to `us-central1`.
 
 ```bash
@@ -127,12 +111,11 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project"
 export VERTEX_LOCATION="us-central1"
 ```
-
 </details>
 
 ### Using `SKILL.md` with AI agents
 
-> [!WARNING]
+> [!NOTE]
 > After you install the skill, edit the `SKILL.md` you copied into your tool’s skill directory and **align it with your current preferences**: default `--model` (`provider/model`), embedding **provider** choice, `--cache-dir` convention, and any provider-specific environment variables or setup notes. The upstream file uses placeholders; agents will not reliably call `semctx` until those sections match your runtime.
 
 This repo’s root `SKILL.md` is the canonical agent guide. Most tools expect **one directory per skill** with a `SKILL.md` inside (not a lone file in the repo root). Download the latest upstream copy like this, then move it into the path your tool lists below:

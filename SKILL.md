@@ -242,9 +242,117 @@ semctx blast-radius SYMBOL_NAME FILE_CONTEXT [--depth-limit N]
 **When to use**: Before renaming or refactoring a symbol, check how many files
 reference it and where. Essential for assessing change impact.
 
+### 7. `grep` — Regex search
+
+Searches supported code and text-index files with deterministic regex matching.
+
+```bash
+semctx grep QUERY [--target-dir PATH] [--depth-limit N] [--ignore-case] [--fixed-strings] [--max-count N] [--before-context N] [--after-context N] [--context N] [--include GLOB]... [--exclude GLOB]... [--code-only] [--text-only] [--summary-only]
+```
+
+| Arg / Option       | Default | Notes                                        |
+| ------------------ | ------- | -------------------------------------------- |
+| `QUERY`            | required | Regex pattern to search for                 |
+| `--target-dir`     | `.`     | Scope the search root                        |
+| `--depth-limit`    | `8`     | Directory depth limit                        |
+| `--ignore-case`    | off     | Match without case sensitivity               |
+| `--fixed-strings`  | off     | Treat the query as a literal string          |
+| `--max-count`      | none    | Maximum matching lines to return             |
+| `--before-context` | `0`     | Leading context lines per match              |
+| `--after-context`  | `0`     | Trailing context lines per match             |
+| `--context`        | `0`     | Sets both leading and trailing context lines |
+| `--include`        | repeatable | Repo-relative glob include filter         |
+| `--exclude`        | repeatable | Repo-relative glob exclude filter         |
+| `--code-only`      | off     | Search only code files                       |
+| `--text-only`      | off     | Search only text-index files                 |
+| `--summary-only`   | off     | Return totals without detailed matches       |
+
+`--code-only` and `--text-only` are mutually exclusive.
+
+**JSON payload keys**: `command`, `query`, `target_dir`, `depth_limit`,
+`match_count`, `returned_count`, `truncated`, `matches[]`.
+
+Each `matches[]` entry includes: `relative_path`, `line_number`, `line_text`,
+`context_before`, `context_after`.
+
+**Structured error codes**: `invalid_regex`, `invalid_arguments`.
+
+**When to use**: Reach for this when you know the literal or regex shape you
+want and need deterministic matches across code and text files. Prefer it over
+semantic search when exact pattern matching matters.
+
+**Acceleration (optional)**: For faster `grep` on large repos, run
+`semctx regex-index init` once. `grep` then transparently uses the index as a
+candidate prefilter and falls back to a full scan when the pattern is not
+safely decomposable (alternation, groups, char classes, or optional
+quantifiers). Without an index, `grep` does a full walker scan — correct, just
+slower on large trees. See section 8 below.
+
+### 8. `regex-index` — Candidate-prefilter index
+
+Builds and maintains an optional local candidate-prefilter index for `grep`.
+This index is provider-agnostic, has no `--model` flag, and is completely
+separate from the semantic index.
+
+```bash
+semctx regex-index init [--target-dir PATH] [--depth-limit N]
+semctx regex-index status [--target-dir PATH] [--depth-limit N]
+semctx regex-index refresh [--target-dir PATH] [--depth-limit N] [--full]
+semctx regex-index clear [--target-dir PATH] [--all]
+```
+
+Shared flags:
+
+- `--target-dir PATH` — scope the workspace content the regex index tracks;
+  defaults to `.`
+- `--depth-limit N` — directory depth limit for `init`, `status`, and
+  `refresh`; defaults to `64`
+
+Subcommands:
+
+- `init` — build a fresh regex index under `<cache-dir>/regex/index.db`
+- `status` — inspect whether the regex index exists and whether it is stale
+- `refresh` — incrementally update the regex index; `--full` rebuilds it
+- `clear` — remove the current regex index; `--all` removes all regex-index
+  artifacts under the cache root
+
+`grep` uses this index transparently when it is present and safe to use. If no
+regex index exists, the query cannot be decomposed safely, or files are not
+proven fresh, `grep` falls back to the normal full scan.
+
+**JSON payload keys**:
+
+- `init`, `status`, `refresh`: `command: "regex-index"`, `subcommand`,
+  `status`
+- `status` fields: `exists`, `indexed_file_count`, `current_file_count`,
+  `stale_file_count`, `missing_from_index_count`, `missing_on_disk_count`,
+  `schema_version`, `stale`
+- `clear`: `command: "regex-index"`, `subcommand: "clear"`, `cleared`,
+  `clear_all`
+
+`clear` always exits successfully; inspect `cleared` to see whether anything
+was actually removed.
+
+**When to use**: Run `regex-index init` once per workspace, then `refresh`
+after meaningful file changes. Call `grep` normally and let semctx use the
+index when it can.
+
 ---
 
 ## Workflows
+
+### Accelerated regex search
+
+```bash
+semctx regex-index init
+semctx --json grep "some_literal" --code-only --max-count 20
+# After files change:
+semctx regex-index refresh
+```
+
+Build the regex index once, call `grep` normally, and refresh the index as
+files change. semctx uses the regex index when it is available and fresh
+enough, and falls back to a full scan when it is not.
 
 ### Explore an unfamiliar repo
 

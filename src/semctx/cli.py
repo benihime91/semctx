@@ -7,7 +7,9 @@ import typer
 from beartype import beartype
 
 from semctx.commands.blast_radius_command import register_blast_radius_command
+from semctx.commands.grep_command import register_grep_command
 from semctx.commands.index_command import register_index_commands
+from semctx.commands.regex_index_command import register_regex_index_command
 from semctx.commands.search_code_command import register_search_code_command
 from semctx.commands.search_identifiers_command import (
   register_search_identifiers_command,
@@ -57,7 +59,9 @@ def main() -> None:
 
 register_tree_command(app)
 register_skeleton_command(app)
+register_grep_command(app)
+register_index_commands(app)
+register_regex_index_command(app)
 register_search_code_command(app)
 register_search_identifiers_command(app)
 register_blast_radius_command(app)
-register_index_commands(app)
